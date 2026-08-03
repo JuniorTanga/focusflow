@@ -132,6 +132,7 @@ input, textarea, select { font-family: inherit; color: inherit; }
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-gutter: stable;
   max-width: 720px;
   width: 100%;
   margin: 0 auto;

@@ -222,7 +222,8 @@ function renderAll() {
 function setupBacklog() {
   $('backlogToggle').addEventListener('click', () => {
     backlogOpen = !backlogOpen;
-    renderAll();
+    const { backlog } = partitionTasks(tasks, new Date());
+    renderBacklog(backlog);
   });
 }
 
