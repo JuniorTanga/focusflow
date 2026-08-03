@@ -12,9 +12,9 @@
   <div class="titlebar" id="titlebar">
     <div class="titlebar-brand" id="titlebarBrand"></div>
     <div class="titlebar-controls">
-      <button class="tb-btn" id="btnMin" title="Minimize" aria-label="Minimize"></button>
-      <button class="tb-btn" id="btnMax" title="Maximize" aria-label="Maximize"></button>
-      <button class="tb-btn close" id="btnClose" title="Close" aria-label="Close"></button>
+      <button class="tb-btn" id="btnMin" data-i18n-title="titlebar.minimize" aria-label="Minimize"></button>
+      <button class="tb-btn" id="btnMax" data-i18n-title="titlebar.maximize" aria-label="Maximize"></button>
+      <button class="tb-btn close" id="btnClose" data-i18n-title="titlebar.close" aria-label="Close"></button>
     </div>
   </div>
 
@@ -27,16 +27,16 @@
       </nav>
 
       <div class="side-group-head">
-        <span class="side-group-title">Groups</span>
-        <button class="icon-btn side-group-add" id="groupAdd" title="New group" aria-label="New group"></button>
+        <span class="side-group-title" data-i18n="groups.title">Groups</span>
+        <button class="icon-btn side-group-add" id="groupAdd" data-i18n-title="group.new" aria-label="New group"></button>
       </div>
       <form class="side-group-input" id="groupForm" hidden>
-        <input id="groupInput" type="text" placeholder="Group name" autocomplete="off" spellcheck="false" />
+        <input id="groupInput" type="text" data-i18n-placeholder="group.placeholder" placeholder="Group name" autocomplete="off" spellcheck="false" />
       </form>
       <div class="side-groups" id="groupList"></div>
 
       <div class="side-footer">
-        <button class="icon-btn theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle theme"></button>
+        <button class="icon-btn theme-toggle" id="themeToggle" data-i18n-title="titlebar.toggleTheme" aria-label="Toggle theme"></button>
       </div>
     </aside>
 
@@ -55,24 +55,24 @@
             <form class="composer-row" id="composerForm">
               <div class="composer-input-wrap">
                 <input class="composer-input" id="taskTitle" type="text"
-                  placeholder="What needs to be done?" autocomplete="off" spellcheck="false" />
+                  data-i18n-placeholder="composer.placeholder" placeholder="What needs to be done?" autocomplete="off" spellcheck="false" />
               </div>
               <button class="composer-details-toggle" id="detailsToggle" type="button"
-                title="Details" aria-label="Toggle task details" aria-expanded="false"></button>
-              <button class="composer-submit" type="submit" title="Add task" aria-label="Add task" id="submitBtn"></button>
+                data-i18n-title="composer.details" title="Details" aria-label="Toggle task details" aria-expanded="false"></button>
+              <button class="composer-submit" type="submit" data-i18n-title="composer.addTask" title="Add task" aria-label="Add task" id="submitBtn"></button>
             </form>
             <div class="composer-details" id="composerDetails">
               <div class="field">
-                <div class="field-label">Priority</div>
-                <div class="seg" id="prioritySeg" role="group" aria-label="Priority">
+                <div class="field-label" data-i18n="composer.priority">Priority</div>
+                <div class="seg" id="prioritySeg" role="group" data-i18n-aria="composer.priority" aria-label="Priority">
                   <button type="button" class="seg-btn" data-value="high">High</button>
                   <button type="button" class="seg-btn" data-value="medium" aria-pressed="true">Medium</button>
                   <button type="button" class="seg-btn" data-value="low">Low</button>
                 </div>
               </div>
               <div class="field">
-                <div class="field-label">Time-box</div>
-                <div class="seg" id="timeboxSeg" role="group" aria-label="Time-box">
+                <div class="field-label" data-i18n="composer.timebox">Time-box</div>
+                <div class="seg" id="timeboxSeg" role="group" data-i18n-aria="composer.timebox" aria-label="Time-box">
                   <button type="button" class="seg-btn" data-value="5">5 min</button>
                   <button type="button" class="seg-btn" data-value="15">15 min</button>
                   <button type="button" class="seg-btn" data-value="30" aria-pressed="true">30 min</button>
@@ -80,12 +80,12 @@
                 </div>
               </div>
               <div class="field">
-                <div class="field-label">When &amp; where</div>
+                <div class="field-label" data-i18n="composer.whenWhere">When &amp; where</div>
                 <input class="composer-input-small" id="taskContext" type="text"
-                  placeholder="e.g. At my desk, after lunch" autocomplete="off" spellcheck="false" />
+                  data-i18n-placeholder="composer.contextPlaceholder" placeholder="e.g. At my desk, after lunch" autocomplete="off" spellcheck="false" />
               </div>
               <div class="field">
-                <div class="field-label">Group</div>
+                <div class="field-label" data-i18n="composer.group">Group</div>
                 <select class="composer-input-small" id="taskGroup">
                   <option value="">No group</option>
                 </select>
@@ -96,7 +96,7 @@
 
         <section class="view" id="view-backlog" hidden>
           <div class="view-head">
-            <h1 class="view-title">Backlog</h1>
+            <h1 class="view-title" data-i18n="backlog.title">Backlog</h1>
             <p class="view-sub" id="backlogFilterLabel"></p>
           </div>
 
@@ -104,7 +104,7 @@
           <div class="backlog-list" id="backlogList"></div>
           <div class="empty-list" id="backlogEmpty" hidden>
             <div class="empty-list-icon" id="backlogEmptyIcon"></div>
-            <p>Nothing waiting here.</p>
+            <p data-i18n="backlog.empty">Nothing waiting here.</p>
           </div>
 
           <div class="section-label" id="doneLabel"></div>
@@ -113,42 +113,43 @@
 
         <section class="view" id="view-settings" hidden>
           <div class="view-head">
-            <h1 class="view-title">Settings</h1>
+            <h1 class="view-title" data-i18n="settings.title">Settings</h1>
           </div>
 
           <div class="settings-card">
             <div class="field">
-              <div class="field-label">Your name</div>
+              <div class="field-label" data-i18n="settings.name">Your name</div>
               <input class="composer-input-small" id="userNameInput" type="text"
-                placeholder="e.g. Sarah" autocomplete="off" spellcheck="false" />
-              <div class="field-hint">Shown in the greeting.</div>
+                data-i18n-placeholder="settings.namePlaceholder" placeholder="e.g. Sarah" autocomplete="off" spellcheck="false" />
+              <div class="field-hint" data-i18n="settings.nameHint">Shown in the greeting.</div>
             </div>
 
             <div class="field">
-              <div class="field-label">Theme</div>
-              <div class="seg" id="settingsThemeSeg" role="group" aria-label="Theme">
+              <div class="field-label" data-i18n="settings.theme">Theme</div>
+              <div class="seg" id="settingsThemeSeg" role="group" data-i18n-aria="settings.theme" aria-label="Theme">
                 <button type="button" class="seg-btn" data-value="light">Light</button>
                 <button type="button" class="seg-btn" data-value="dark">Dark</button>
                 <button type="button" class="seg-btn" data-value="system">System</button>
               </div>
             </div>
 
+            <div class="field">
+              <div class="field-label" data-i18n="settings.language">Language</div>
+              <div class="seg" id="settingsLangSeg" role="group" data-i18n-aria="settings.language" aria-label="Language">
+                <button type="button" class="seg-btn" data-value="en" aria-pressed="true">English</button>
+                <button type="button" class="seg-btn" data-value="fr">Français</button>
+              </div>
+            </div>
+
             <div class="settings-danger">
               <button class="btn btn-danger" id="clearDataBtn"></button>
-              <div class="field-hint">Removes every task, group and setting.</div>
+              <div class="field-hint" data-i18n="settings.clearHint">Removes every task, group and setting.</div>
             </div>
           </div>
 
           <div class="settings-card shortcut-card">
-            <div class="field-label">Keyboard shortcuts</div>
-            <ul class="shortcut-list">
-              <li><span>New task</span><kbd>Ctrl+N</kbd></li>
-              <li><span>Focus task field</span><kbd>Ctrl+K</kbd></li>
-              <li><span>Home</span><kbd>Ctrl+1</kbd></li>
-              <li><span>Backlog</span><kbd>Ctrl+2</kbd></li>
-              <li><span>Settings</span><kbd>Ctrl+3</kbd></li>
-              <li><span>Close / cancel</span><kbd>Esc</kbd></li>
-            </ul>
+            <div class="field-label" data-i18n="settings.shortcuts">Keyboard shortcuts</div>
+            <ul class="shortcut-list" id="shortcutList"></ul>
           </div>
         </section>
 
@@ -160,17 +161,17 @@
 
   <div class="modal-overlay" id="rescheduleModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal">
-      <h2 class="modal-title" id="modalTitle">Postpone this?</h2>
-      <p class="modal-subtitle">No pressure. When works better?</p>
+      <h2 class="modal-title" id="modalTitle" data-i18n="modal.title">Postpone this?</h2>
+      <p class="modal-subtitle" data-i18n="modal.subtitle">No pressure. When works better?</p>
       <div class="option-list" id="rescheduleOptions"></div>
       <div class="reason">
-        <div class="field-label">Why? A few honest words.</div>
-        <textarea id="reasonInput" placeholder="I am blocked on…, I need a break from it…" spellcheck="false"></textarea>
+        <div class="field-label" data-i18n="modal.reasonLabel">Why? A few honest words.</div>
+        <textarea id="reasonInput" data-i18n-placeholder="modal.reasonPlaceholder" placeholder="I am blocked on…, I need a break from it…" spellcheck="false"></textarea>
         <div class="reason-hint" id="reasonHint">A short reason first — this keeps delays honest.</div>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-ghost" id="modalCancel">Keep it here</button>
-        <button class="btn btn-primary" id="modalConfirm" disabled>Move it</button>
+        <button class="btn btn-ghost" id="modalCancel" data-i18n="modal.keep">Keep it here</button>
+        <button class="btn btn-primary" id="modalConfirm" data-i18n="modal.move" disabled>Move it</button>
       </div>
     </div>
   </div>

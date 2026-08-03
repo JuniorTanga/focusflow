@@ -10,6 +10,7 @@ import {
   timeBucket
 } from './logic.js';
 import { icon } from './icons.js';
+import { t, setLang, getLang, LANGS } from './i18n.js';
 
 const STORAGE_KEY = 'focusflow.v1';
 const $ = (id) => document.getElementById(id);
@@ -18,16 +19,14 @@ let tasks = [];
 let groups = [];
 let themePreference = null;
 let userName = '';
+let langPreference = 'en';
 let currentView = 'home';
 let activeGroupId = null;
 let modalTaskId = null;
 let modalDue = 'today';
 let composing = { priority: 'medium', timebox: 30, groupId: '' };
 
-const PRIORITY_LABEL = { high: 'High', medium: 'Medium', low: 'Low' };
-const DUE_LABEL = { today: 'Today', tomorrow: 'Tomorrow', week: 'This week' };
 const BUCKET_ICON = { morning: 'sun', afternoon: 'sun', evening: 'moon', night: 'moon' };
-const BUCKET_LABEL = { morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening', night: 'Night' };
 const CELEBRATION_COLORS = ['var(--accent)', 'var(--warm)', 'var(--accent-strong)'];
 const GROUP_COLORS = ['#bd9259', '#6b8e74', '#8a7ba8', '#a8696b', '#5f8a94', '#9a7b4f'];
 
@@ -42,7 +41,8 @@ function loadState() {
       tasks: Array.isArray(data.tasks) ? data.tasks : [],
       groups: Array.isArray(data.groups) ? data.groups : [],
       theme: data.theme === 'light' || data.theme === 'dark' ? data.theme : null,
-      userName: typeof data.userName === 'string' ? data.userName : ''
+      userName: typeof data.userName === 'string' ? data.userName : '',
+      lang: LANGS.includes(data.lang) ? data.lang : 'en'
     };
   } catch {
     return null;
@@ -50,7 +50,7 @@ function loadState() {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, groups, theme: themePreference, userName }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, groups, theme: themePreference, userName, lang: langPreference }));
 }
 
 /* ---------------- Theme ---------------- */
@@ -99,13 +99,13 @@ function groupOf(task) {
 }
 
 function priorityTag(task) {
-  const p = task.priority in PRIORITY_LABEL ? task.priority : 'medium';
-  return `<span class="tag ${esc(p)}">${icon('zap')}${PRIORITY_LABEL[p]}</span>`;
+  const p = task.priority in { high: 1, medium: 1, low: 1 } ? task.priority : 'medium';
+  return `<span class="tag ${esc(p)}">${icon('zap')}${esc(t('priority.' + p))}</span>`;
 }
 
 function dueTag(task) {
-  const d = task.due in DUE_LABEL ? task.due : 'today';
-  return `<span class="tag ${esc(d)}">${icon('calendar')}${DUE_LABEL[d]}</span>`;
+  const d = task.due in { today: 1, tomorrow: 1, week: 1 } ? task.due : 'today';
+  return `<span class="tag ${esc(d)}">${icon('calendar')}${esc(t('due.' + d))}</span>`;
 }
 
 function timeboxTag(task) {
@@ -133,10 +133,10 @@ function renderGroupList() {
 
   let html = `
     <button class="group-item" data-gid="" aria-pressed="${active === null}">
-      ${icon('inbox')}<span>All</span><span class="group-count">${allCount}</span>
+      ${icon('inbox')}<span>${esc(t('group.all'))}</span><span class="group-count">${allCount}</span>
     </button>
     <button class="group-item" data-gid="ungrouped" aria-pressed="${active === 'ungrouped'}">
-      ${icon('folder')}<span>Ungrouped</span><span class="group-count">${ungroupedCount}</span>
+      ${icon('folder')}<span>${esc(t('group.ungrouped'))}</span><span class="group-count">${ungroupedCount}</span>
     </button>`;
 
   groups.forEach((g) => {
@@ -165,8 +165,9 @@ function renderComposerGroups() {
   const select = $('taskGroup');
   const keep = composing.groupId && groups.some((g) => g.id === composing.groupId) ? composing.groupId : '';
   composing.groupId = keep;
-  select.innerHTML = `<option value="">No group</option>` +
+  select.innerHTML = `<option value="">${esc(t('group.none'))}</option>` +
     groups.map((g) => `<option value="${esc(g.id)}" ${g.id === composing.groupId ? 'selected' : ''}>${esc(g.name)}</option>`).join('');
+  select.setAttribute('aria-label', t('composer.group'));
 }
 
 function addGroup() {
@@ -198,11 +199,11 @@ function setupGroupAdd() {
 
 function renderGreeting(doneCount) {
   const now = new Date();
-  const g = greetingFor(now, doneCount, userName.trim() || null);
+  const g = greetingFor(now, doneCount, userName.trim() || null, getLang());
   const bucket = timeBucket(now);
   $('greeting').innerHTML = `
     <div class="greeting-eyebrow">
-      <span>${icon(BUCKET_ICON[bucket])}${BUCKET_LABEL[bucket]}</span>
+      <span>${icon(BUCKET_ICON[bucket])}${esc(t('bucket.' + bucket))}</span>
     </div>
     <h1 class="greeting-label">${esc(g.label)}</h1>
     <p class="greeting-line">${esc(g.line)}</p>`;
@@ -210,14 +211,14 @@ function renderGreeting(doneCount) {
 
 function renderHero(task) {
   const label = $('heroLabel');
-  label.innerHTML = `${icon('target')}Focus on this`;
+  label.innerHTML = `${icon('target')}${esc(t('hero.focus'))}`;
 
   if (!task) {
     $('hero').innerHTML = `
       <div class="hero-empty">
         <div class="hero-empty-icon">${icon('checkCircle')}</div>
-        <div class="hero-empty-title">Nothing here yet.</div>
-        <p>Add your first task below. One thing at a time.</p>
+        <div class="hero-empty-title">${esc(t('hero.emptyTitle'))}</div>
+        <p>${esc(t('hero.emptyLine'))}</p>
       </div>`;
     return;
   }
@@ -228,15 +229,15 @@ function renderHero(task) {
       <div class="hero-top">
         <div class="hero-tags">${priorityTag(task)}${dueTag(task)}${timeboxTag(task)}${g ? `<span class="tag">${icon('folder')}${esc(g.name)}</span>` : ''}</div>
         <div class="hero-actions-top">
-          <button class="icon-btn" id="heroPostpone" title="Postpone" aria-label="Postpone">${icon('refresh')}</button>
-          <button class="icon-btn danger" id="heroDelete" title="Delete" aria-label="Delete">${icon('trash')}</button>
+          <button class="icon-btn" id="heroPostpone" title="${esc(t('action.postpone'))}" aria-label="${esc(t('action.postpone'))}">${icon('refresh')}</button>
+          <button class="icon-btn danger" id="heroDelete" title="${esc(t('action.delete'))}" aria-label="${esc(t('action.delete'))}">${icon('trash')}</button>
         </div>
       </div>
       <h2 class="hero-title">${esc(task.title)}</h2>
       ${task.whenWhere ? `<p class="hero-context">${icon('mapPin')}${esc(task.whenWhere)}</p>` : ''}
       <div class="hero-actions">
-        <button class="btn btn-primary" id="heroDone">${icon('check')}Done</button>
-        <button class="btn btn-ghost" id="heroPostponeBtn">${icon('refresh')}Postpone</button>
+        <button class="btn btn-primary" id="heroDone">${icon('check')}${esc(t('hero.done'))}</button>
+        <button class="btn btn-ghost" id="heroPostponeBtn">${icon('refresh')}${esc(t('hero.postpone'))}</button>
       </div>
     </div>`;
 
@@ -247,8 +248,8 @@ function renderHero(task) {
 }
 
 function groupMoveOptions(task) {
-  const options = [{ id: '', name: 'No group' }, ...groups.map((g) => ({ id: g.id, name: g.name }))];
-  return `<select class="backlog-group-select" data-move="${esc(task.id)}" aria-label="Move to group">
+  const options = [{ id: '', name: t('group.none') }, ...groups.map((g) => ({ id: g.id, name: g.name }))];
+  return `<select class="backlog-group-select" data-move="${esc(task.id)}" aria-label="${esc(t('group.moveTo'))}">
     ${options.map((o) => `<option value="${esc(o.id)}" ${o.id === task.groupId ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
   </select>`;
 }
@@ -257,10 +258,10 @@ function renderBacklog() {
   const { backlog, doneToday } = partitionTasks(tasks, new Date());
 
   const filterLabel = activeGroupId === null
-    ? 'All tasks'
+    ? t('backlog.all')
     : activeGroupId === 'ungrouped'
-      ? 'Ungrouped'
-      : (groupById(activeGroupId)?.name ?? 'All tasks');
+      ? t('group.ungrouped')
+      : (groupById(activeGroupId)?.name ?? t('backlog.all'));
   $('backlogFilterLabel').textContent = filterLabel;
 
   const filtered = activeGroupId === 'ungrouped'
@@ -269,21 +270,21 @@ function renderBacklog() {
       ? backlog.filter((t) => t.groupId === activeGroupId)
       : backlog;
 
-  $('backlogLabel').innerHTML = `${icon('list')}Backlog <span class="done-count">· ${filtered.length}</span>`;
+  $('backlogLabel').innerHTML = `${icon('list')}${esc(t('backlog.title'))} <span class="done-count">· ${filtered.length}</span>`;
   $('backlogEmptyIcon').innerHTML = icon('inbox');
   $('backlogEmpty').hidden = filtered.length > 0;
-  $('backlogList').innerHTML = filtered.map((t) => {
-    const g = groupOf(t);
+  $('backlogList').innerHTML = filtered.map((item) => {
+    const g = groupOf(item);
     return `
-    <div class="backlog-item" data-id="${t.id}">
-      <span class="backlog-title">${esc(t.title)}</span>
+    <div class="backlog-item" data-id="${item.id}">
+      <span class="backlog-title">${esc(item.title)}</span>
       ${g ? `<span class="backlog-group"><span class="group-dot" data-dot="${esc(g.color)}"></span>${esc(g.name)}</span>` : ''}
       <span class="backlog-meta">
-        <span>${icon('calendar')}${DUE_LABEL[t.due] ?? 'Today'}</span>
-        ${t.timebox ? `<span>${icon('clock')}${t.timebox} min</span>` : ''}
+        <span>${icon('calendar')}${esc(t('due.' + (item.due in { today: 1, tomorrow: 1, week: 1 } ? item.due : 'today')))}</span>
+        ${item.timebox ? `<span>${icon('clock')}${item.timebox} min</span>` : ''}
       </span>
-      ${groupMoveOptions(t)}
-      <button class="icon-btn" data-del="${t.id}" title="Delete" aria-label="Delete">${icon('trash')}</button>
+      ${groupMoveOptions(item)}
+      <button class="icon-btn" data-del="${item.id}" title="${esc(t('action.delete'))}" aria-label="${esc(t('action.delete'))}">${icon('trash')}</button>
     </div>`;
   }).join('');
 
@@ -313,13 +314,13 @@ function renderBacklog() {
   });
 
   $('doneLabel').innerHTML = doneToday.length === 0
-    ? `${icon('check')}Done today`
-    : `${icon('check')}Done today <span class="done-count">· ${doneToday.length}</span>`;
-  $('doneList').innerHTML = doneToday.map((t) => `
+    ? `${icon('check')}${esc(t('done.today'))}`
+    : `${icon('check')}${esc(t('done.today'))} <span class="done-count">· ${doneToday.length}</span>`;
+  $('doneList').innerHTML = doneToday.map((item) => `
     <div class="done-item">
       ${icon('check')}
-      <span class="done-title">${esc(t.title)}</span>
-      <span class="done-time">${esc(timeLabel(t.completedAt))}</span>
+      <span class="done-title">${esc(item.title)}</span>
+      <span class="done-time">${esc(timeLabel(item.completedAt))}</span>
     </div>`).join('');
 }
 
@@ -330,15 +331,23 @@ function renderSettingsTheme() {
   });
 }
 
+function renderSettingsLanguage() {
+  LANGS.forEach((v) => {
+    const btn = $('settingsLangSeg').querySelector(`[data-value="${v}"]`);
+    btn?.setAttribute('aria-pressed', String(langPreference === v));
+  });
+}
+
 function renderSettings() {
   $('userNameInput').value = userName;
   renderSettingsTheme();
+  renderSettingsLanguage();
 }
 
 function renderPrinciple() {
-  const p = principleOfDay(new Date());
+  const p = principleOfDay(new Date(), getLang());
   $('principle').innerHTML = `
-    <div class="principle-label">${icon('zap')}Principle of the day</div>
+    <div class="principle-label">${icon('zap')}${esc(t('principle.label'))}</div>
     <div class="principle-name">${esc(p.name)}</div>
     <div class="principle-line">${esc(p.line)}</div>
     <p class="principle-why">${esc(p.why)}</p>`;
@@ -409,9 +418,9 @@ function deleteTask(id) {
 /* ---------------- Reschedule (friction) ---------------- */
 
 const OPTIONS = [
-  { value: 'today', label: 'Later today', icon: 'clock' },
-  { value: 'tomorrow', label: 'Tomorrow', icon: 'calendar' },
-  { value: 'week', label: 'This week', icon: 'list' }
+  { value: 'today', labelKey: 'modal.laterToday', icon: 'clock' },
+  { value: 'tomorrow', labelKey: 'modal.tomorrow', icon: 'calendar' },
+  { value: 'week', labelKey: 'modal.week', icon: 'list' }
 ];
 
 function openReschedule(id) {
@@ -421,7 +430,7 @@ function openReschedule(id) {
   modalDue = resolveDueForReschedule(task.due);
   $('rescheduleOptions').innerHTML = OPTIONS.map((o) => `
     <button class="option" data-value="${o.value}" aria-pressed="${modalDue === o.value}">
-      ${icon(o.icon)}${o.label}
+      ${icon(o.icon)}${esc(t(o.labelKey))}
     </button>`).join('');
 
   $('rescheduleOptions').querySelectorAll('.option').forEach((btn) => {
@@ -434,7 +443,7 @@ function openReschedule(id) {
 
   const reason = $('reasonInput');
   reason.value = '';
-  $('reasonHint').textContent = 'A short reason first — this keeps delays honest.';
+  $('reasonHint').textContent = t('modal.reasonHint');
   $('modalConfirm').disabled = true;
   $('rescheduleModal').classList.add('active');
   reason.focus();
@@ -500,12 +509,18 @@ function setupTitlebar() {
   if (window.appWindow?.onMaximizeStateChange) {
     window.appWindow.onMaximizeStateChange((maximized) => {
       $('btnMax').innerHTML = maximized ? icon('copy') : icon('square');
-      $('btnMax').title = maximized ? 'Restore' : 'Maximize';
+      $('btnMax').title = t(maximized ? 'titlebar.restore' : 'titlebar.maximize');
     });
   }
 }
 
 /* ---------------- Composer ---------------- */
+
+function setComposerDetails(open) {
+  $('composerDetails').classList.toggle('open', open);
+  $('detailsToggle').classList.toggle('open', open);
+  $('detailsToggle').setAttribute('aria-expanded', String(open));
+}
 
 function setupComposer() {
   $('composerForm').addEventListener('submit', (e) => {
@@ -517,9 +532,7 @@ function setupComposer() {
   detailsToggle.innerHTML = icon('chevronUp');
   $('submitBtn').innerHTML = icon('plus');
   detailsToggle.addEventListener('click', () => {
-    const open = $('composerDetails').classList.toggle('open');
-    detailsToggle.classList.toggle('open', open);
-    detailsToggle.setAttribute('aria-expanded', String(open));
+    setComposerDetails(!$('composerDetails').classList.contains('open'));
   });
 
   const segs = [
@@ -550,8 +563,8 @@ function setupModal() {
     const valid = validateReason($('reasonInput').value);
     $('modalConfirm').disabled = !valid;
     $('reasonHint').textContent = valid
-      ? 'Good. Honest delays are allowed.'
-      : 'A short reason first — this keeps delays honest.';
+      ? t('modal.reasonGood')
+      : t('modal.reasonHint');
   });
   $('rescheduleModal').addEventListener('click', (e) => {
     if (e.target === $('rescheduleModal')) closeReschedule();
@@ -561,17 +574,19 @@ function setupModal() {
 /* ---------------- Shortcuts ---------------- */
 
 const SHORTCUTS = [
-  { key: 'n', mod: true, action: 'newTask', help: 'New task' },
-  { key: '1', mod: true, action: 'view', view: 'home', help: 'Home' },
-  { key: '2', mod: true, action: 'view', view: 'backlog', help: 'Backlog' },
-  { key: '3', mod: true, action: 'view', view: 'settings', help: 'Settings' },
-  { key: 'k', mod: true, action: 'focusTask', help: 'Focus the add-task field' }
+  { key: '/', mod: false, action: 'newTask' },
+  { key: 'n', mod: true, action: 'newTask' },
+  { key: '1', mod: true, action: 'view', view: 'home' },
+  { key: '2', mod: true, action: 'view', view: 'backlog' },
+  { key: '3', mod: true, action: 'view', view: 'settings' },
+  { key: 'k', mod: true, action: 'focusTask' }
 ];
 
 function shortcutTargets(action, view) {
   if (action === 'view') return setView(view);
   if (action === 'newTask') {
     if (currentView !== 'home') setView('home');
+    if (!$('composerDetails').classList.contains('open')) setComposerDetails(true);
     $('taskTitle').focus();
     return;
   }
@@ -593,6 +608,14 @@ function setupShortcuts() {
       else if (!$('groupForm').hidden) {
         $('groupForm').hidden = true;
         $('groupInput').value = '';
+      }
+      return;
+    }
+
+    if (e.key === 'Tab' && currentView === 'home' && target === $('taskTitle')) {
+      if (!$('composerDetails').classList.contains('open')) {
+        e.preventDefault();
+        setComposerDetails(true);
       }
       return;
     }
@@ -627,9 +650,9 @@ function setupSettings() {
     saveState();
     renderGroupList();
   });
-  $('clearDataBtn').innerHTML = `${icon('trash')}Clear all data`;
+  $('clearDataBtn').textContent = t('settings.clear');
   $('clearDataBtn').addEventListener('click', () => {
-    if (!confirm('Remove every task, group and setting? This cannot be undone.')) return;
+    if (!confirm(t('settings.clearConfirm'))) return;
     tasks = [];
     groups = [];
     userName = '';
@@ -642,6 +665,68 @@ function setupSettings() {
   });
 }
 
+/* ---------------- Localization ---------------- */
+
+const SHORTCUT_LIST = [
+  ['/', 'shortcut.quickAdd'],
+  ['Tab', 'shortcut.openDetails'],
+  ['Ctrl+N', 'shortcut.newTask'],
+  ['Ctrl+K', 'shortcut.focusTask'],
+  ['Ctrl+1', 'shortcut.home'],
+  ['Ctrl+2', 'shortcut.backlog'],
+  ['Ctrl+3', 'shortcut.settings'],
+  ['Esc', 'shortcut.close']
+];
+
+function applyStrings() {
+  document.documentElement.lang = langPreference;
+
+  $('navHome').innerHTML = `${icon('home')}${esc(t('nav.home'))}`;
+  $('navBacklog').innerHTML = `${icon('list')}${esc(t('nav.backlog'))}`;
+  $('navSettings').innerHTML = `${icon('settings')}${esc(t('nav.settings'))}`;
+  $('groupAdd').innerHTML = icon('folderPlus');
+
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    const label = t(el.dataset.i18nTitle);
+    el.title = label;
+    el.setAttribute('aria-label', label);
+  });
+  document.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+    el.setAttribute('aria-label', t(el.dataset.i18nAria));
+  });
+
+  document.querySelectorAll('#prioritySeg .seg-btn').forEach((btn) => {
+    btn.textContent = t('priority.' + btn.dataset.value);
+  });
+  document.querySelectorAll('#timeboxSeg .seg-btn').forEach((btn) => {
+    btn.textContent = `${btn.dataset.value} min`;
+  });
+  document.querySelectorAll('#settingsThemeSeg .seg-btn').forEach((btn) => {
+    btn.textContent = t('theme.' + btn.dataset.value);
+  });
+  document.querySelectorAll('#settingsLangSeg .seg-btn').forEach((btn) => {
+    btn.textContent = t('lang.' + btn.dataset.value);
+  });
+
+  $('shortcutList').innerHTML = SHORTCUT_LIST.map(([kbd, key]) =>
+    `<li><span>${esc(t(key))}</span><kbd>${kbd}</kbd></li>`).join('');
+}
+
+function setLangPref(value) {
+  langPreference = LANGS.includes(value) ? value : 'en';
+  setLang(langPreference);
+  saveState();
+  applyStrings();
+  renderSettingsLanguage();
+  renderAll();
+}
+
 /* ---------------- Init ---------------- */
 
 function init() {
@@ -650,6 +735,10 @@ function init() {
   groups = saved ? saved.groups : [];
   themePreference = saved ? saved.theme : null;
   userName = saved ? saved.userName : '';
+  langPreference = saved
+    ? saved.lang
+    : (navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en');
+  setLang(langPreference);
 
   const now = new Date();
   const pruned = pruneOldCompletions(tasks, now);
@@ -665,10 +754,11 @@ function init() {
   setupSettings();
   setupShortcuts();
 
-  $('navHome').innerHTML = `${icon('home')}Home`;
-  $('navBacklog').innerHTML = `${icon('list')}Backlog`;
-  $('navSettings').innerHTML = `${icon('settings')}Settings`;
-  $('groupAdd').innerHTML = icon('folderPlus');
+  $('settingsLangSeg').querySelectorAll('.seg-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setLangPref(btn.dataset.value));
+  });
+
+  applyStrings();
 
   setView('home');
   renderAll();

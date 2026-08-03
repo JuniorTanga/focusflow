@@ -11,9 +11,9 @@ import {
   greetingFor,
   principleOfDay,
   timeBucket,
-  dayNumber,
-  PRINCIPLES
+  dayNumber
 } from '../renderer/logic.js';
+import { GREETINGS, PRINCIPLES } from '../renderer/i18n.js';
 
 const NOON = new Date(2026, 7, 2, 12, 0, 0);
 const ISO = (d) => d.toISOString();
@@ -111,15 +111,33 @@ test('greetingFor inserts the user name into the label', () => {
   assert.equal(plain.label.includes('Sarah'), false);
 });
 
+test('greetingFor supports French', () => {
+  const en = greetingFor(new Date(2026, 7, 2, 9), 0, null, 'en');
+  const fr = greetingFor(new Date(2026, 7, 2, 9), 0, null, 'fr');
+  assert.notEqual(en.label, fr.label);
+  assert.ok(GREETINGS.fr.morning.none.some((p) => p.label === fr.label));
+  assert.ok(GREETINGS.en.morning.none.some((p) => p.label === en.label));
+});
+
 test('principleOfDay is stable per date and covers all principles', () => {
   const a = principleOfDay(new Date(2026, 7, 2));
   const b = principleOfDay(new Date(2026, 7, 2, 23, 59));
   assert.equal(a, b);
   const seen = new Set();
-  for (let i = 0; i < PRINCIPLES.length; i++) {
+  for (let i = 0; i < PRINCIPLES.en.length; i++) {
     seen.add(principleOfDay(new Date(2026, 0, 1 + i)).name);
   }
-  assert.equal(seen.size, PRINCIPLES.length);
+  assert.equal(seen.size, PRINCIPLES.en.length);
+});
+
+test('principleOfDay supports French', () => {
+  const d = new Date(2026, 7, 2);
+  const en = principleOfDay(d, 'en');
+  const fr = principleOfDay(d, 'fr');
+  assert.equal(fr.name, PRINCIPLES.fr[dayNumber(d) % PRINCIPLES.fr.length].name);
+  assert.equal(en.name, PRINCIPLES.en[dayNumber(d) % PRINCIPLES.en.length].name);
+  assert.notEqual(en.line, fr.line);
+  assert.ok(fr.name.length > 0 && fr.why.length > 0);
 });
 
 test('dayNumber is monotonic across days', () => {

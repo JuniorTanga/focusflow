@@ -1,3 +1,5 @@
+import { GREETINGS, PRINCIPLES } from './i18n.js';
+
 export const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
 export const DUE_ORDER = { today: 0, tomorrow: 1, week: 2 };
 export const PRIORITIES = Object.keys(PRIORITY_ORDER);
@@ -95,87 +97,16 @@ function stateClass(doneCount) {
   return 'many';
 }
 
-const GREETINGS = {
-  morning: {
-    none: [
-      { label: 'Good morning.', line: 'No pressure — just one small thing when you are ready.' },
-      { label: 'Morning.', line: 'A slow start still counts as a start.' },
-      { label: 'Good morning.', line: 'What is the one thing that would make today feel complete?' }
-    ],
-    one: [
-      { label: 'Good morning.', line: 'One thing done already. Gently onward.' },
-      { label: 'Morning.', line: 'A first step is behind you. Nice work.' }
-    ],
-    many: [
-      { label: 'Good morning.', line: 'You have already done N things today. That is a real beginning.' },
-      { label: 'Morning.', line: 'N down. The day has shape to it now.' }
-    ]
-  },
-  afternoon: {
-    none: [
-      { label: 'Good afternoon.', line: 'The day is not over. One small thing is enough.' },
-      { label: 'Afternoon.', line: 'A short task now beats a long one later.' }
-    ],
-    one: [
-      { label: 'Good afternoon.', line: 'One done today. The next is closer than it feels.' },
-      { label: 'Afternoon.', line: 'You started. That is half the work.' }
-    ],
-    many: [
-      { label: 'Good afternoon.', line: 'N things done today. Keep going at your own pace.' },
-      { label: 'Afternoon.', line: 'N finished already. Plenty of daylight left, no rush.' }
-    ]
-  },
-  evening: {
-    none: [
-      { label: 'Good evening.', line: 'Evenings suit the easy tasks. Pick something tiny.' },
-      { label: 'Evening.', line: 'One small thing, then rest easy.' }
-    ],
-    one: [
-      { label: 'Good evening.', line: 'One thing done today — something to build on.' },
-      { label: 'Evening.', line: 'You did one today. That counts.' }
-    ],
-    many: [
-      { label: 'Good evening.', line: 'N things done today. Notice how that looks.' },
-      { label: 'Evening.', line: 'N finished. A good place to stop.' }
-    ]
-  },
-  night: {
-    none: [
-      { label: 'It is late.', line: 'Rest matters. If anything, keep it tiny and kind.' },
-      { label: 'Late again.', line: 'Nothing done yet is fine. Tomorrow has room.' }
-    ],
-    one: [
-      { label: 'It is late.', line: 'You got one in today. That is enough to count.' },
-      { label: 'Late.', line: 'One done. Let the day close.' }
-    ],
-    many: [
-      { label: 'It is late.', line: 'N things done today. Time to let the day close.' },
-      { label: 'Late.', line: 'N finished. Rest well.' }
-    ]
-  }
-};
-
-export function greetingFor(now = new Date(), doneCount = 0, name = null) {
+export function greetingFor(now = new Date(), doneCount = 0, name = null, lang = 'en') {
   const bucket = timeBucket(now);
-  const pool = GREETINGS[bucket][stateClass(doneCount)];
+  const dict = GREETINGS[lang] ?? GREETINGS.en;
+  const pool = dict[bucket][stateClass(doneCount)];
   const pick = pool[dayNumber(now) % pool.length];
   const label = name ? pick.label.replace(/\.$/, '') + `, ${name}.` : pick.label;
   return { bucket, label, line: pick.line };
 }
 
-export const PRINCIPLES = [
-  { name: 'Hick\u2019s Law', line: 'Fewer choices, faster action.', why: 'Every visible option is a decision. One task on screen removes the cost of choosing.' },
-  { name: 'The Zeigarnik Effect', line: 'Unfinished tasks linger.', why: 'Open loops nag at the mind. Closing them — even in tiny steps — frees your attention.' },
-  { name: 'Implementation Intentions', line: 'Plan the when and where.', why: 'Tasks with a time and place are two to three times more likely to get done.' },
-  { name: 'Friction Design', line: 'Make delay honest.', why: 'When postponing costs a little effort, you postpone for real reasons, not impulses.' },
-  { name: 'Micro-Steps', line: 'Shrink the task until it is easy.', why: 'Vague, large tasks trigger a threat response; tiny steps slip past it.' },
-  { name: 'Attention Residue', line: 'One focus at a time.', why: 'Switching tasks leaves mental residue. A single focus protects your attention.' },
-  { name: 'The Fresh Start', line: 'Each day is a clean page.', why: 'A broken streak is not a failure. Today starts fresh, without shame.' },
-  { name: 'Small Wins', line: 'Mark the finish.', why: 'Visible progress releases the tension of unfinished work and builds momentum.' },
-  { name: 'Visual Calm', line: 'Softer screens, clearer mind.', why: 'A calm interface lowers anxiety — no harsh colors, no visual reprimands.' },
-  { name: 'Energy Matching', line: 'Do the right task at the right time.', why: 'Matching a task to your current energy makes starting feel possible.' }
-];
-
-export function principleOfDay(now = new Date()) {
-  return PRINCIPLES[dayNumber(now) % PRINCIPLES.length];
+export function principleOfDay(now = new Date(), lang = 'en') {
+  const dict = PRINCIPLES[lang] ?? PRINCIPLES.en;
+  return dict[dayNumber(now) % dict.length];
 }
