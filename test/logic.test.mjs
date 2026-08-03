@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createTask,
+  createGroup,
   sortTasks,
   partitionTasks,
   pruneOldCompletions,
@@ -28,7 +29,21 @@ test('createTask applies defaults', () => {
   assert.equal(t.whenWhere, null);
   assert.equal(t.timebox, null);
   assert.equal(t.completedAt, null);
+  assert.equal(t.groupId, null);
   assert.ok(t.id);
+});
+
+test('createTask keeps a provided groupId', () => {
+  const t = createTask({ title: 'Write report', groupId: 'g1' });
+  assert.equal(t.groupId, 'g1');
+});
+
+test('createGroup builds a group and trims its name', () => {
+  const g = createGroup({ name: '  Work  ', color: '#123456' });
+  assert.equal(g.name, 'Work');
+  assert.equal(g.color, '#123456');
+  assert.ok(g.id);
+  assert.ok(g.createdAt);
 });
 
 test('sortTasks orders by due, then priority, then created', () => {
@@ -87,6 +102,13 @@ test('greetingFor is stable within a day and reacts to progress', () => {
   const progressed = greetingFor(new Date(2026, 7, 2, 14), 3);
   assert.notEqual(g.label + g.line, progressed.label + progressed.line);
   assert.ok(g.label.length > 0 && g.line.length > 0);
+});
+
+test('greetingFor inserts the user name into the label', () => {
+  const g = greetingFor(new Date(2026, 7, 2, 9), 0, 'Sarah');
+  assert.match(g.label, /Sarah/);
+  const plain = greetingFor(new Date(2026, 7, 2, 9), 0, null);
+  assert.equal(plain.label.includes('Sarah'), false);
 });
 
 test('principleOfDay is stable per date and covers all principles', () => {

@@ -18,66 +18,132 @@
     </div>
   </div>
 
-  <div class="app" id="app">
-    <header class="greeting" id="greeting"></header>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <nav class="side-nav" aria-label="Primary">
+        <button class="nav-item" data-view="home" aria-pressed="true" id="navHome"></button>
+        <button class="nav-item" data-view="backlog" aria-pressed="false" id="navBacklog"></button>
+        <button class="nav-item" data-view="settings" aria-pressed="false" id="navSettings"></button>
+      </nav>
 
-    <main>
-      <section class="hero" aria-label="Current task">
-        <div class="section-label" id="heroLabel"></div>
-        <div id="hero"></div>
-      </section>
-    </main>
-
-    <section class="composer" id="composer">
-      <form class="composer-row" id="composerForm">
-        <div class="composer-input-wrap">
-          <input class="composer-input" id="taskTitle" type="text"
-            placeholder="What needs to be done?" autocomplete="off" spellcheck="false" />
-        </div>
-        <button class="composer-details-toggle" id="detailsToggle" type="button"
-          title="Details" aria-label="Toggle task details" aria-expanded="false"></button>
-        <button class="composer-submit" type="submit" title="Add task" aria-label="Add task" id="submitBtn"></button>
-      </form>
-      <div class="composer-details" id="composerDetails">
-        <div class="field">
-          <div class="field-label">Priority</div>
-          <div class="seg" id="prioritySeg" role="group" aria-label="Priority">
-            <button type="button" class="seg-btn" data-value="high">High</button>
-            <button type="button" class="seg-btn" data-value="medium" aria-pressed="true">Medium</button>
-            <button type="button" class="seg-btn" data-value="low">Low</button>
-          </div>
-        </div>
-        <div class="field">
-          <div class="field-label">Time-box</div>
-          <div class="seg" id="timeboxSeg" role="group" aria-label="Time-box">
-            <button type="button" class="seg-btn" data-value="5">5 min</button>
-            <button type="button" class="seg-btn" data-value="15">15 min</button>
-            <button type="button" class="seg-btn" data-value="30" aria-pressed="true">30 min</button>
-            <button type="button" class="seg-btn" data-value="60">60 min</button>
-          </div>
-        </div>
-        <div class="field">
-          <div class="field-label">When &amp; where</div>
-          <input class="composer-input-small" id="taskContext" type="text"
-            placeholder="e.g. At my desk, after lunch" autocomplete="off" spellcheck="false" />
-        </div>
+      <div class="side-group-head">
+        <span class="side-group-title">Groups</span>
+        <button class="icon-btn side-group-add" id="groupAdd" title="New group" aria-label="New group"></button>
       </div>
-    </section>
+      <form class="side-group-input" id="groupForm" hidden>
+        <input id="groupInput" type="text" placeholder="Group name" autocomplete="off" spellcheck="false" />
+      </form>
+      <div class="side-groups" id="groupList"></div>
 
-    <section class="done-section" id="doneSection" hidden>
-      <div class="section-label"><span id="doneLabel"></span></div>
-      <div class="done-list" id="doneList"></div>
-    </section>
+      <div class="side-footer">
+        <button class="icon-btn theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle theme"></button>
+      </div>
+    </aside>
 
-    <section class="backlog" id="backlogSection">
-      <button class="backlog-toggle" id="backlogToggle" aria-expanded="false">
-        <span class="bt-left"><span id="backlogTitle"></span></span>
-        <span class="chev" id="backlogChevron"></span>
-      </button>
-      <div class="backlog-list" id="backlogList"></div>
-    </section>
+    <main class="content" id="content">
+      <div class="app" id="app">
 
-    <footer class="principle" id="principle"></footer>
+        <section class="view" id="view-home">
+          <header class="greeting" id="greeting"></header>
+
+          <section class="hero" aria-label="Current task">
+            <div class="section-label" id="heroLabel"></div>
+            <div id="hero"></div>
+          </section>
+
+          <section class="composer" id="composer">
+            <form class="composer-row" id="composerForm">
+              <div class="composer-input-wrap">
+                <input class="composer-input" id="taskTitle" type="text"
+                  placeholder="What needs to be done?" autocomplete="off" spellcheck="false" />
+              </div>
+              <button class="composer-details-toggle" id="detailsToggle" type="button"
+                title="Details" aria-label="Toggle task details" aria-expanded="false"></button>
+              <button class="composer-submit" type="submit" title="Add task" aria-label="Add task" id="submitBtn"></button>
+            </form>
+            <div class="composer-details" id="composerDetails">
+              <div class="field">
+                <div class="field-label">Priority</div>
+                <div class="seg" id="prioritySeg" role="group" aria-label="Priority">
+                  <button type="button" class="seg-btn" data-value="high">High</button>
+                  <button type="button" class="seg-btn" data-value="medium" aria-pressed="true">Medium</button>
+                  <button type="button" class="seg-btn" data-value="low">Low</button>
+                </div>
+              </div>
+              <div class="field">
+                <div class="field-label">Time-box</div>
+                <div class="seg" id="timeboxSeg" role="group" aria-label="Time-box">
+                  <button type="button" class="seg-btn" data-value="5">5 min</button>
+                  <button type="button" class="seg-btn" data-value="15">15 min</button>
+                  <button type="button" class="seg-btn" data-value="30" aria-pressed="true">30 min</button>
+                  <button type="button" class="seg-btn" data-value="60">60 min</button>
+                </div>
+              </div>
+              <div class="field">
+                <div class="field-label">When &amp; where</div>
+                <input class="composer-input-small" id="taskContext" type="text"
+                  placeholder="e.g. At my desk, after lunch" autocomplete="off" spellcheck="false" />
+              </div>
+              <div class="field">
+                <div class="field-label">Group</div>
+                <select class="composer-input-small" id="taskGroup">
+                  <option value="">No group</option>
+                </select>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-backlog" hidden>
+          <div class="view-head">
+            <h1 class="view-title">Backlog</h1>
+            <p class="view-sub" id="backlogFilterLabel"></p>
+          </div>
+
+          <div class="section-label" id="backlogLabel"></div>
+          <div class="backlog-list" id="backlogList"></div>
+          <div class="empty-list" id="backlogEmpty" hidden>
+            <div class="empty-list-icon" id="backlogEmptyIcon"></div>
+            <p>Nothing waiting here.</p>
+          </div>
+
+          <div class="section-label" id="doneLabel"></div>
+          <div class="done-list" id="doneList"></div>
+        </section>
+
+        <section class="view" id="view-settings" hidden>
+          <div class="view-head">
+            <h1 class="view-title">Settings</h1>
+          </div>
+
+          <div class="settings-card">
+            <div class="field">
+              <div class="field-label">Your name</div>
+              <input class="composer-input-small" id="userNameInput" type="text"
+                placeholder="e.g. Sarah" autocomplete="off" spellcheck="false" />
+              <div class="field-hint">Shown in the greeting.</div>
+            </div>
+
+            <div class="field">
+              <div class="field-label">Theme</div>
+              <div class="seg" id="settingsThemeSeg" role="group" aria-label="Theme">
+                <button type="button" class="seg-btn" data-value="light">Light</button>
+                <button type="button" class="seg-btn" data-value="dark">Dark</button>
+                <button type="button" class="seg-btn" data-value="system">System</button>
+              </div>
+            </div>
+
+            <div class="settings-danger">
+              <button class="btn btn-danger" id="clearDataBtn"></button>
+              <div class="field-hint">Removes every task, group and setting.</div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <footer class="principle" id="principle"></footer>
+    </main>
   </div>
 
   <div class="modal-overlay" id="rescheduleModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">

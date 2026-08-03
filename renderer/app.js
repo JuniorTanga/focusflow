@@ -1,5 +1,6 @@
 import {
   createTask,
+  createGroup,
   partitionTasks,
   pruneOldCompletions,
   validateReason,
@@ -14,17 +15,21 @@ const STORAGE_KEY = 'focusflow.v1';
 const $ = (id) => document.getElementById(id);
 
 let tasks = [];
+let groups = [];
 let themePreference = null;
-let backlogOpen = false;
+let userName = '';
+let currentView = 'home';
+let activeGroupId = null;
 let modalTaskId = null;
 let modalDue = 'today';
-let composing = { priority: 'medium', timebox: 30 };
+let composing = { priority: 'medium', timebox: 30, groupId: '' };
 
 const PRIORITY_LABEL = { high: 'High', medium: 'Medium', low: 'Low' };
 const DUE_LABEL = { today: 'Today', tomorrow: 'Tomorrow', week: 'This week' };
 const BUCKET_ICON = { morning: 'sun', afternoon: 'sun', evening: 'moon', night: 'moon' };
 const BUCKET_LABEL = { morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening', night: 'Night' };
 const CELEBRATION_COLORS = ['var(--accent)', 'var(--warm)', 'var(--accent-strong)'];
+const GROUP_COLORS = ['#bd9259', '#6b8e74', '#8a7ba8', '#a8696b', '#5f8a94', '#9a7b4f'];
 
 /* ---------------- State ---------------- */
 
@@ -35,7 +40,9 @@ function loadState() {
     const data = JSON.parse(raw);
     return {
       tasks: Array.isArray(data.tasks) ? data.tasks : [],
-      theme: data.theme === 'light' || data.theme === 'dark' ? data.theme : null
+      groups: Array.isArray(data.groups) ? data.groups : [],
+      theme: data.theme === 'light' || data.theme === 'dark' ? data.theme : null,
+      userName: typeof data.userName === 'string' ? data.userName : ''
     };
   } catch {
     return null;
@@ -43,7 +50,7 @@ function loadState() {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, theme: themePreference }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, groups, theme: themePreference, userName }));
 }
 
 /* ---------------- Theme ---------------- */
@@ -59,10 +66,15 @@ function applyTheme() {
   if (btn) btn.innerHTML = resolvedTheme() === 'dark' ? icon('sun') : icon('moon');
 }
 
-function toggleTheme() {
-  themePreference = resolvedTheme() === 'dark' ? 'light' : 'dark';
+function setTheme(value) {
+  themePreference = value === 'light' || value === 'dark' ? value : null;
   applyTheme();
   saveState();
+  renderSettingsTheme();
+}
+
+function toggleTheme() {
+  setTheme(resolvedTheme() === 'dark' ? 'light' : 'dark');
 }
 
 /* ---------------- Helpers ---------------- */
@@ -76,6 +88,14 @@ function esc(value) {
 function timeLabel(iso) {
   const d = new Date(iso);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function groupById(id) {
+  return groups.find((g) => g.id === id) ?? null;
+}
+
+function groupOf(task) {
+  return task.groupId ? groupById(task.groupId) : null;
 }
 
 function priorityTag(task) {
@@ -93,21 +113,105 @@ function timeboxTag(task) {
   return `<span class="tag">${icon('clock')}${task.timebox} min</span>`;
 }
 
+/* ---------------- Navigation ---------------- */
+
+function setView(view) {
+  currentView = view;
+  ['home', 'backlog', 'settings'].forEach((v) => {
+    $('nav' + v.charAt(0).toUpperCase() + v.slice(1)).setAttribute('aria-pressed', String(v === view));
+    $('view-' + v).hidden = v !== view;
+  });
+  renderAll();
+}
+
+/* ---------------- Sidebar groups ---------------- */
+
+function renderGroupList() {
+  const active = activeGroupId;
+  const allCount = tasks.filter((t) => !t.completedAt).length;
+  const ungroupedCount = tasks.filter((t) => !t.completedAt && !t.groupId).length;
+
+  let html = `
+    <button class="group-item" data-gid="" aria-pressed="${active === null}">
+      ${icon('inbox')}<span>All</span><span class="group-count">${allCount}</span>
+    </button>
+    <button class="group-item" data-gid="ungrouped" aria-pressed="${active === 'ungrouped'}">
+      ${icon('folder')}<span>Ungrouped</span><span class="group-count">${ungroupedCount}</span>
+    </button>`;
+
+  groups.forEach((g) => {
+    const count = tasks.filter((t) => !t.completedAt && t.groupId === g.id).length;
+    html += `
+    <button class="group-item" data-gid="${esc(g.id)}" data-color="${esc(g.color)}" aria-pressed="${active === g.id}">
+      <span class="group-dot"></span><span>${esc(g.name)}</span><span class="group-count">${count}</span>
+    </button>`;
+  });
+
+  $('groupList').innerHTML = html;
+  $('groupList').querySelectorAll('[data-color]').forEach((el) => {
+    el.querySelector('.group-dot').style.background = el.dataset.color;
+  });
+  $('groupList').querySelectorAll('.group-item').forEach((el) => {
+    el.addEventListener('click', () => {
+      activeGroupId = el.dataset.gid === '' ? null : el.dataset.gid;
+      renderGroupList();
+      if (currentView !== 'backlog') setView('backlog');
+      else renderAll();
+    });
+  });
+}
+
+function renderComposerGroups() {
+  const select = $('taskGroup');
+  const keep = composing.groupId && groups.some((g) => g.id === composing.groupId) ? composing.groupId : '';
+  composing.groupId = keep;
+  select.innerHTML = `<option value="">No group</option>` +
+    groups.map((g) => `<option value="${esc(g.id)}" ${g.id === composing.groupId ? 'selected' : ''}>${esc(g.name)}</option>`).join('');
+}
+
+function addGroup() {
+  const input = $('groupInput');
+  const name = input.value.trim();
+  if (!name) return;
+  groups.push(createGroup({ name, color: GROUP_COLORS[groups.length % GROUP_COLORS.length] }));
+  input.value = '';
+  $('groupForm').hidden = true;
+  saveState();
+  renderGroupList();
+  renderComposerGroups();
+  renderAll();
+}
+
+function setupGroupAdd() {
+  $('groupAdd').addEventListener('click', () => {
+    const wrap = $('groupForm');
+    wrap.hidden = !wrap.hidden;
+    if (!wrap.hidden) $('groupInput').focus();
+  });
+  $('groupForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    addGroup();
+  });
+  $('groupInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      $('groupForm').hidden = true;
+      $('groupInput').value = '';
+    }
+  });
+}
+
 /* ---------------- Render ---------------- */
 
 function renderGreeting(doneCount) {
   const now = new Date();
-  const g = greetingFor(now, doneCount);
+  const g = greetingFor(now, doneCount, userName.trim() || null);
   const bucket = timeBucket(now);
   $('greeting').innerHTML = `
     <div class="greeting-eyebrow">
       <span>${icon(BUCKET_ICON[bucket])}${BUCKET_LABEL[bucket]}</span>
-      <button class="icon-btn theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle theme"></button>
     </div>
     <h1 class="greeting-label">${esc(g.label)}</h1>
     <p class="greeting-line">${esc(g.line)}</p>`;
-  $('themeToggle').addEventListener('click', toggleTheme);
-  applyTheme();
 }
 
 function renderHero(task) {
@@ -124,10 +228,11 @@ function renderHero(task) {
     return;
   }
 
+  const g = groupOf(task);
   $('hero').innerHTML = `
     <div class="hero-card" id="heroCard">
       <div class="hero-top">
-        <div class="hero-tags">${priorityTag(task)}${dueTag(task)}${timeboxTag(task)}</div>
+        <div class="hero-tags">${priorityTag(task)}${dueTag(task)}${timeboxTag(task)}${g ? `<span class="tag">${icon('folder')}${esc(g.name)}</span>` : ''}</div>
         <div class="hero-actions-top">
           <button class="icon-btn" id="heroPostpone" title="Postpone" aria-label="Postpone">${icon('refresh')}</button>
           <button class="icon-btn danger" id="heroDelete" title="Delete" aria-label="Delete">${icon('trash')}</button>
@@ -147,14 +252,75 @@ function renderHero(task) {
   $('heroDelete').addEventListener('click', () => deleteTask(task.id));
 }
 
-function renderDone(doneToday) {
-  const section = $('doneSection');
-  if (doneToday.length === 0) {
-    section.hidden = true;
-    return;
-  }
-  section.hidden = false;
-  $('doneLabel').innerHTML = `${icon('check')}Done today <span class="done-count">· ${doneToday.length}</span>`;
+function groupMoveOptions(task) {
+  const options = [{ id: '', name: 'No group' }, ...groups.map((g) => ({ id: g.id, name: g.name }))];
+  return `<select class="backlog-group-select" data-move="${esc(task.id)}" aria-label="Move to group">
+    ${options.map((o) => `<option value="${esc(o.id)}" ${o.id === task.groupId ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+  </select>`;
+}
+
+function renderBacklog() {
+  const { backlog, doneToday } = partitionTasks(tasks, new Date());
+
+  const filterLabel = activeGroupId === null
+    ? 'All tasks'
+    : activeGroupId === 'ungrouped'
+      ? 'Ungrouped'
+      : (groupById(activeGroupId)?.name ?? 'All tasks');
+  $('backlogFilterLabel').textContent = filterLabel;
+
+  const filtered = activeGroupId === 'ungrouped'
+    ? backlog.filter((t) => !t.groupId)
+    : activeGroupId
+      ? backlog.filter((t) => t.groupId === activeGroupId)
+      : backlog;
+
+  $('backlogLabel').innerHTML = `${icon('list')}Backlog <span class="done-count">· ${filtered.length}</span>`;
+  $('backlogEmptyIcon').innerHTML = icon('inbox');
+  $('backlogEmpty').hidden = filtered.length > 0;
+  $('backlogList').innerHTML = filtered.map((t) => {
+    const g = groupOf(t);
+    return `
+    <div class="backlog-item" data-id="${t.id}">
+      <span class="backlog-title">${esc(t.title)}</span>
+      ${g ? `<span class="backlog-group"><span class="group-dot" data-dot="${esc(g.color)}"></span>${esc(g.name)}</span>` : ''}
+      <span class="backlog-meta">
+        <span>${icon('calendar')}${DUE_LABEL[t.due] ?? 'Today'}</span>
+        ${t.timebox ? `<span>${icon('clock')}${t.timebox} min</span>` : ''}
+      </span>
+      ${groupMoveOptions(t)}
+      <button class="icon-btn" data-del="${t.id}" title="Delete" aria-label="Delete">${icon('trash')}</button>
+    </div>`;
+  }).join('');
+
+  $('backlogList').querySelectorAll('[data-dot]').forEach((el) => {
+    el.style.background = el.dataset.dot;
+  });
+
+  $('backlogList').querySelectorAll('.backlog-item').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('[data-del]') || e.target.closest('.backlog-group-select')) return;
+      promoteTask(el.dataset.id);
+    });
+  });
+  $('backlogList').querySelectorAll('[data-del]').forEach((btn) => {
+    btn.addEventListener('click', () => deleteTask(btn.dataset.del));
+  });
+  $('backlogList').querySelectorAll('[data-move]').forEach((sel) => {
+    sel.addEventListener('change', () => {
+      const task = tasks.find((t) => t.id === sel.dataset.move);
+      if (!task) return;
+      task.groupId = sel.value || null;
+      saveState();
+      renderBacklog();
+      renderGroupList();
+      renderHero(partitionTasks(tasks, new Date()).next);
+    });
+  });
+
+  $('doneLabel').innerHTML = doneToday.length === 0
+    ? `${icon('check')}Done today`
+    : `${icon('check')}Done today <span class="done-count">· ${doneToday.length}</span>`;
   $('doneList').innerHTML = doneToday.map((t) => `
     <div class="done-item">
       ${icon('check')}
@@ -163,40 +329,16 @@ function renderDone(doneToday) {
     </div>`).join('');
 }
 
-function renderBacklog(backlog) {
-  const section = $('backlogSection');
-  if (backlog.length === 0) {
-    section.hidden = true;
-    return;
-  }
-  section.hidden = false;
-  const count = backlog.length;
-  $('backlogTitle').innerHTML = `${icon('list')}Backlog <span class="done-count">· ${count}</span>`;
-  $('backlogChevron').innerHTML = icon('chevronDown');
-
-  const toggle = $('backlogToggle');
-  toggle.setAttribute('aria-expanded', String(backlogOpen));
-  $('backlogList').classList.toggle('open', backlogOpen);
-
-  $('backlogList').innerHTML = backlog.map((t) => `
-    <div class="backlog-item" data-id="${t.id}">
-      <span class="backlog-title">${esc(t.title)}</span>
-      <span class="backlog-meta">
-        <span>${icon('calendar')}${DUE_LABEL[t.due] ?? 'Today'}</span>
-        ${t.timebox ? `<span>${icon('clock')}${t.timebox} min</span>` : ''}
-      </span>
-      <button class="icon-btn" data-del="${t.id}" title="Delete" aria-label="Delete">${icon('trash')}</button>
-    </div>`).join('');
-
-  $('backlogList').querySelectorAll('.backlog-item').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      if (e.target.closest('[data-del]')) return;
-      promoteTask(el.dataset.id);
-    });
+function renderSettingsTheme() {
+  ['light', 'dark', 'system'].forEach((v) => {
+    const btn = $('settingsThemeSeg').querySelector(`[data-value="${v}"]`);
+    btn?.setAttribute('aria-pressed', String((themePreference ?? 'system') === v));
   });
-  $('backlogList').querySelectorAll('[data-del]').forEach((btn) => {
-    btn.addEventListener('click', () => deleteTask(btn.dataset.del));
-  });
+}
+
+function renderSettings() {
+  $('userNameInput').value = userName;
+  renderSettingsTheme();
 }
 
 function renderPrinciple() {
@@ -209,22 +351,18 @@ function renderPrinciple() {
 }
 
 function renderAll() {
-  const { next, backlog, doneToday } = partitionTasks(tasks, new Date());
-  renderGreeting(doneToday.length);
-  renderHero(next);
-  renderDone(doneToday);
-  renderBacklog(backlog);
+  const { next, doneToday } = partitionTasks(tasks, new Date());
+  renderGroupList();
+  renderComposerGroups();
+  if (currentView === 'home') {
+    renderGreeting(doneToday.length);
+    renderHero(next);
+  } else if (currentView === 'backlog') {
+    renderBacklog();
+  } else {
+    renderSettings();
+  }
   renderPrinciple();
-}
-
-/* ---------------- Backlog ---------------- */
-
-function setupBacklog() {
-  $('backlogToggle').addEventListener('click', () => {
-    backlogOpen = !backlogOpen;
-    const { backlog } = partitionTasks(tasks, new Date());
-    renderBacklog(backlog);
-  });
 }
 
 /* ---------------- Actions ---------------- */
@@ -240,7 +378,8 @@ function addTaskFromComposer() {
     title,
     priority: composing.priority,
     timebox: composing.timebox,
-    whenWhere: $('taskContext').value.trim() || null
+    whenWhere: $('taskContext').value.trim() || null,
+    groupId: composing.groupId || null
   }));
   input.value = '';
   $('taskContext').value = '';
@@ -402,6 +541,10 @@ function setupComposer() {
       });
     });
   });
+
+  $('taskGroup').addEventListener('change', () => {
+    composing.groupId = $('taskGroup').value;
+  });
 }
 
 /* ---------------- Modal events ---------------- */
@@ -424,12 +567,41 @@ function setupModal() {
   });
 }
 
+/* ---------------- Settings ---------------- */
+
+function setupSettings() {
+  $('themeToggle').addEventListener('click', toggleTheme);
+  $('settingsThemeSeg').querySelectorAll('.seg-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setTheme(btn.dataset.value));
+  });
+  $('userNameInput').addEventListener('input', () => {
+    userName = $('userNameInput').value;
+    saveState();
+    renderGroupList();
+  });
+  $('clearDataBtn').innerHTML = `${icon('trash')}Clear all data`;
+  $('clearDataBtn').addEventListener('click', () => {
+    if (!confirm('Remove every task, group and setting? This cannot be undone.')) return;
+    tasks = [];
+    groups = [];
+    userName = '';
+    activeGroupId = null;
+    currentView = 'home';
+    saveState();
+    applyTheme();
+    setView('home');
+    renderAll();
+  });
+}
+
 /* ---------------- Init ---------------- */
 
 function init() {
   const saved = loadState();
   tasks = saved ? saved.tasks : [];
+  groups = saved ? saved.groups : [];
   themePreference = saved ? saved.theme : null;
+  userName = saved ? saved.userName : '';
 
   const now = new Date();
   const pruned = pruneOldCompletions(tasks, now);
@@ -440,15 +612,31 @@ function init() {
 
   setupTitlebar();
   setupComposer();
-  setupBacklog();
+  setupGroupAdd();
   setupModal();
+  setupSettings();
+
+  $('navHome').innerHTML = `${icon('home')}Home`;
+  $('navBacklog').innerHTML = `${icon('list')}Backlog`;
+  $('navSettings').innerHTML = `${icon('settings')}Settings`;
+  $('groupAdd').innerHTML = icon('folderPlus');
+
+  setView('home');
   renderAll();
 
+  document.querySelectorAll('.nav-item').forEach((btn) => {
+    btn.addEventListener('click', () => setView(btn.dataset.view));
+  });
+
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (!themePreference) applyTheme();
+    if (!themePreference) {
+      applyTheme();
+      renderSettingsTheme();
+    }
   });
 
   setInterval(() => {
+    if (currentView !== 'home') return;
     const { doneToday } = partitionTasks(tasks, new Date());
     renderGreeting(doneToday.length);
   }, 60_000);

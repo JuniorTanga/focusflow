@@ -24,7 +24,7 @@ export function dayNumber(now) {
   return Math.floor(localMidnight.getTime() / 86400000);
 }
 
-export function createTask({ title, whenWhere = null, priority = 'medium', timebox = null, due = 'today', completedAt = null, now = new Date() }) {
+export function createTask({ title, whenWhere = null, priority = 'medium', timebox = null, due = 'today', completedAt = null, groupId = null, now = new Date() }) {
   return {
     id: newId(),
     title,
@@ -32,8 +32,18 @@ export function createTask({ title, whenWhere = null, priority = 'medium', timeb
     priority,
     timebox,
     due,
+    groupId,
     createdAt: now.toISOString(),
     completedAt
+  };
+}
+
+export function createGroup({ name, color = null, now = new Date() }) {
+  return {
+    id: newId(),
+    name: String(name ?? '').trim(),
+    color,
+    createdAt: now.toISOString()
   };
 }
 
@@ -145,11 +155,12 @@ const GREETINGS = {
   }
 };
 
-export function greetingFor(now = new Date(), doneCount = 0) {
+export function greetingFor(now = new Date(), doneCount = 0, name = null) {
   const bucket = timeBucket(now);
   const pool = GREETINGS[bucket][stateClass(doneCount)];
   const pick = pool[dayNumber(now) % pool.length];
-  return { bucket, label: pick.label, line: pick.line };
+  const label = name ? pick.label.replace(/\.$/, '') + `, ${name}.` : pick.label;
+  return { bucket, label, line: pick.line };
 }
 
 export const PRINCIPLES = [
