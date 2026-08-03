@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; font-src 'self'; img-src 'self' data:" />
+  <title>FocusFlow</title>
+  <link rel="stylesheet" href="fonts.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-theme="light">
+  <div class="titlebar" id="titlebar">
+    <div class="titlebar-brand" id="titlebarBrand"></div>
+    <div class="titlebar-controls">
+      <button class="tb-btn" id="btnMin" title="Minimize" aria-label="Minimize"></button>
+      <button class="tb-btn" id="btnMax" title="Maximize" aria-label="Maximize"></button>
+      <button class="tb-btn close" id="btnClose" title="Close" aria-label="Close"></button>
+    </div>
+  </div>
+
+  <div class="app" id="app">
+    <header class="greeting" id="greeting"></header>
+
+    <main>
+      <section class="hero" aria-label="Current task">
+        <div class="section-label" id="heroLabel"></div>
+        <div id="hero"></div>
+      </section>
+
+      <section class="done-section" id="doneSection" hidden>
+        <div class="section-label"><span id="doneLabel"></span></div>
+        <div class="done-list" id="doneList"></div>
+      </section>
+
+      <section class="backlog" id="backlogSection">
+        <button class="backlog-toggle" id="backlogToggle" aria-expanded="false">
+          <span class="bt-left"><span id="backlogTitle"></span></span>
+          <span class="chev" id="backlogChevron"></span>
+        </button>
+        <div class="backlog-list" id="backlogList"></div>
+      </section>
+    </main>
+
+    <section class="composer" id="composer">
+      <form class="composer-row" id="composerForm">
+        <div class="composer-input-wrap">
+          <input class="composer-input" id="taskTitle" type="text"
+            placeholder="What needs to be done?" autocomplete="off" spellcheck="false" />
+        </div>
+        <button class="composer-details-toggle" id="detailsToggle" type="button"
+          title="Details" aria-label="Toggle task details" aria-expanded="false"></button>
+        <button class="composer-submit" type="submit" title="Add task" aria-label="Add task" id="submitBtn"></button>
+      </form>
+      <div class="composer-details" id="composerDetails">
+        <div class="field">
+          <div class="field-label">Priority</div>
+          <div class="seg" id="prioritySeg" role="group" aria-label="Priority">
+            <button type="button" class="seg-btn" data-value="high">High</button>
+            <button type="button" class="seg-btn" data-value="medium" aria-pressed="true">Medium</button>
+            <button type="button" class="seg-btn" data-value="low">Low</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label">Time-box</div>
+          <div class="seg" id="timeboxSeg" role="group" aria-label="Time-box">
+            <button type="button" class="seg-btn" data-value="5">5 min</button>
+            <button type="button" class="seg-btn" data-value="15">15 min</button>
+            <button type="button" class="seg-btn" data-value="30" aria-pressed="true">30 min</button>
+            <button type="button" class="seg-btn" data-value="60">60 min</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label">When &amp; where</div>
+          <input class="composer-input-small" id="taskContext" type="text"
+            placeholder="e.g. At my desk, after lunch" autocomplete="off" spellcheck="false" />
+        </div>
+      </div>
+    </section>
+
+    <footer class="principle" id="principle"></footer>
+  </div>
+
+  <div class="modal-overlay" id="rescheduleModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <h2 class="modal-title" id="modalTitle">Postpone this?</h2>
+      <p class="modal-subtitle">No pressure. When works better?</p>
+      <div class="option-list" id="rescheduleOptions"></div>
+      <div class="reason">
+        <div class="field-label">Why? A few honest words.</div>
+        <textarea id="reasonInput" placeholder="I am blocked on…, I need a break from it…" spellcheck="false"></textarea>
+        <div class="reason-hint" id="reasonHint">A short reason first — this keeps delays honest.</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="modalCancel">Keep it here</button>
+        <button class="btn btn-primary" id="modalConfirm" disabled>Move it</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="celebration" id="celebration" aria-hidden="true"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

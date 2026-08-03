@@ -1,0 +1,15 @@
+{
+  "name": "focusflow",
+  "version": "0.1.0",
+  "description": "A calm, single-task anti-procrastination app for the desktop.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/*.test.mjs\"",
+    "fonts": "node scripts/fetch-fonts.mjs"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.0.0"
+  }
+}
