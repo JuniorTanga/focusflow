@@ -6,10 +6,12 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test \"test/*.test.mjs\"",
-    "fonts": "node scripts/fetch-fonts.mjs"
+    "fonts": "node scripts/fetch-fonts.mjs",
+    "pack:win": "electron-packager . FocusFlow --platform=win32 --arch=x64 --out=dist --overwrite --ignore=test --ignore=scripts"
   },
   "license": "MIT",
   "devDependencies": {
-    "electron": "^31.0.0"
+    "electron": "^31.0.0",
+    "electron-packager": "^17.1.2"
   }
 }
