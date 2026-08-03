@@ -574,7 +574,7 @@ function setupModal() {
 /* ---------------- Shortcuts ---------------- */
 
 const SHORTCUTS = [
-  { key: '/', mod: false, action: 'newTask' },
+  { key: '/', mod: false, action: 'quickAdd' },
   { key: 'n', mod: true, action: 'newTask' },
   { key: '1', mod: true, action: 'view', view: 'home' },
   { key: '2', mod: true, action: 'view', view: 'backlog' },
@@ -584,6 +584,12 @@ const SHORTCUTS = [
 
 function shortcutTargets(action, view) {
   if (action === 'view') return setView(view);
+  if (action === 'quickAdd') {
+    if (currentView !== 'home') setView('home');
+    setComposerDetails(!$('composerDetails').classList.contains('open'));
+    $('taskTitle').focus();
+    return;
+  }
   if (action === 'newTask') {
     if (currentView !== 'home') setView('home');
     if (!$('composerDetails').classList.contains('open')) setComposerDetails(true);
@@ -613,10 +619,8 @@ function setupShortcuts() {
     }
 
     if (e.key === 'Tab' && currentView === 'home' && target === $('taskTitle')) {
-      if (!$('composerDetails').classList.contains('open')) {
-        e.preventDefault();
-        setComposerDetails(true);
-      }
+      e.preventDefault();
+      setComposerDetails(!$('composerDetails').classList.contains('open'));
       return;
     }
 
