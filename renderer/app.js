@@ -763,6 +763,7 @@ function init() {
   });
 
   applyStrings();
+  applyTheme();
 
   setView('home');
   renderAll();
