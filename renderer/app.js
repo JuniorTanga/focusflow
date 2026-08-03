@@ -192,12 +192,6 @@ function setupGroupAdd() {
     e.preventDefault();
     addGroup();
   });
-  $('groupInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      $('groupForm').hidden = true;
-      $('groupInput').value = '';
-    }
-  });
 }
 
 /* ---------------- Render ---------------- */
@@ -562,8 +556,62 @@ function setupModal() {
   $('rescheduleModal').addEventListener('click', (e) => {
     if (e.target === $('rescheduleModal')) closeReschedule();
   });
+}
+
+/* ---------------- Shortcuts ---------------- */
+
+const SHORTCUTS = [
+  { key: 'n', mod: true, action: 'newTask', help: 'New task' },
+  { key: '1', mod: true, action: 'view', view: 'home', help: 'Home' },
+  { key: '2', mod: true, action: 'view', view: 'backlog', help: 'Backlog' },
+  { key: '3', mod: true, action: 'view', view: 'settings', help: 'Settings' },
+  { key: 'k', mod: true, action: 'focusTask', help: 'Focus the add-task field' }
+];
+
+function shortcutTargets(action, view) {
+  if (action === 'view') return setView(view);
+  if (action === 'newTask') {
+    if (currentView !== 'home') setView('home');
+    $('taskTitle').focus();
+    return;
+  }
+  if (action === 'focusTask') {
+    if (currentView !== 'home') setView('home');
+    const input = $('taskTitle');
+    input.focus();
+    input.select();
+  }
+}
+
+function setupShortcuts() {
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && $('rescheduleModal').classList.contains('active')) closeReschedule();
+    const target = e.target;
+    const typing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement;
+
+    if (e.key === 'Escape') {
+      if ($('rescheduleModal').classList.contains('active')) closeReschedule();
+      else if (!$('groupForm').hidden) {
+        $('groupForm').hidden = true;
+        $('groupInput').value = '';
+      }
+      return;
+    }
+
+    if (typing && (e.metaKey || e.ctrlKey)) {
+      if (e.key.toLowerCase() === 'n') e.preventDefault();
+    } else if (typing) {
+      return;
+    }
+
+    for (const s of SHORTCUTS) {
+      const mod = e.metaKey || e.ctrlKey;
+      if (s.mod !== mod) continue;
+      if (e.key.toLowerCase() !== s.key) continue;
+      if (s.action === 'view' && currentView === s.view) continue;
+      e.preventDefault();
+      shortcutTargets(s.action, s.view);
+      break;
+    }
   });
 }
 
@@ -615,6 +663,7 @@ function init() {
   setupGroupAdd();
   setupModal();
   setupSettings();
+  setupShortcuts();
 
   $('navHome').innerHTML = `${icon('home')}Home`;
   $('navBacklog').innerHTML = `${icon('list')}Backlog`;
