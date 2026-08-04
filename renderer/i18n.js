@@ -49,6 +49,7 @@ export const STRINGS = {
     'action.delete': 'Delete',
     'action.restore': 'Restore',
     'action.maximize': 'Maximize',
+    'action.makeActive': 'Make active',
 
     'due.today': 'Today',
     'due.tomorrow': 'Tomorrow',
@@ -142,6 +143,7 @@ export const STRINGS = {
     'action.delete': 'Supprimer',
     'action.restore': 'Rétablir',
     'action.maximize': 'Agrandir',
+    'action.makeActive': 'Rendre active',
 
     'due.today': 'Aujourd\u2019hui',
     'due.tomorrow': 'Demain',

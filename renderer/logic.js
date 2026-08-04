@@ -63,12 +63,15 @@ export function sortTasks(tasks) {
   });
 }
 
-export function partitionTasks(tasks, now = new Date()) {
+export function partitionTasks(tasks, now = new Date(), activeTaskId = null) {
   const incomplete = sortTasks(tasks.filter((t) => !t.completedAt));
+  const active = activeTaskId ? incomplete.find((t) => t.id === activeTaskId) ?? null : null;
+  const next = active ?? incomplete[0] ?? null;
   const doneToday = tasks
     .filter((t) => t.completedAt && isSameDay(new Date(t.completedAt), now))
     .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt));
-  return { next: incomplete[0] ?? null, backlog: incomplete.slice(1), doneToday };
+  const backlog = incomplete.filter((t) => t !== next);
+  return { next, backlog, doneToday };
 }
 
 export function pruneOldCompletions(tasks, now = new Date()) {

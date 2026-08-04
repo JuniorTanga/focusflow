@@ -20,6 +20,7 @@ let groups = [];
 let themePreference = null;
 let userName = '';
 let langPreference = 'en';
+let activeTaskId = null;
 let currentView = 'home';
 let activeGroupId = null;
 let modalTaskId = null;
@@ -42,7 +43,8 @@ function loadState() {
       groups: Array.isArray(data.groups) ? data.groups : [],
       theme: data.theme === 'light' || data.theme === 'dark' ? data.theme : null,
       userName: typeof data.userName === 'string' ? data.userName : '',
-      lang: LANGS.includes(data.lang) ? data.lang : 'en'
+      lang: LANGS.includes(data.lang) ? data.lang : 'en',
+      activeTaskId: typeof data.activeTaskId === 'string' ? data.activeTaskId : null
     };
   } catch {
     return null;
@@ -50,7 +52,7 @@ function loadState() {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, groups, theme: themePreference, userName, lang: langPreference }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, groups, theme: themePreference, userName, lang: langPreference, activeTaskId }));
 }
 
 /* ---------------- Theme ---------------- */
@@ -96,6 +98,10 @@ function groupById(id) {
 
 function groupOf(task) {
   return task.groupId ? groupById(task.groupId) : null;
+}
+
+function getPartition() {
+  return partitionTasks(tasks, new Date(), activeTaskId);
 }
 
 function priorityTag(task) {
@@ -255,7 +261,7 @@ function groupMoveOptions(task) {
 }
 
 function renderBacklog() {
-  const { backlog, doneToday } = partitionTasks(tasks, new Date());
+  const { backlog, doneToday } = getPartition();
 
   const filterLabel = activeGroupId === null
     ? t('backlog.all')
@@ -284,6 +290,7 @@ function renderBacklog() {
         ${item.timebox ? `<span>${icon('clock')}${item.timebox} min</span>` : ''}
       </span>
       ${groupMoveOptions(item)}
+      <button class="icon-btn backlog-act" data-act="${item.id}" title="${esc(t('action.makeActive'))}" aria-label="${esc(t('action.makeActive'))}">${icon('target')}</button>
       <button class="icon-btn" data-del="${item.id}" title="${esc(t('action.delete'))}" aria-label="${esc(t('action.delete'))}">${icon('trash')}</button>
     </div>`;
   }).join('');
@@ -294,12 +301,15 @@ function renderBacklog() {
 
   $('backlogList').querySelectorAll('.backlog-item').forEach((el) => {
     el.addEventListener('click', (e) => {
-      if (e.target.closest('[data-del]') || e.target.closest('.backlog-group-select')) return;
+      if (e.target.closest('[data-del]') || e.target.closest('[data-act]') || e.target.closest('.backlog-group-select')) return;
       promoteTask(el.dataset.id);
     });
   });
   $('backlogList').querySelectorAll('[data-del]').forEach((btn) => {
     btn.addEventListener('click', () => deleteTask(btn.dataset.del));
+  });
+  $('backlogList').querySelectorAll('[data-act]').forEach((btn) => {
+    btn.addEventListener('click', () => makeActive(btn.dataset.act));
   });
   $('backlogList').querySelectorAll('[data-move]').forEach((sel) => {
     sel.addEventListener('change', () => {
@@ -309,7 +319,7 @@ function renderBacklog() {
       saveState();
       renderBacklog();
       renderGroupList();
-      renderHero(partitionTasks(tasks, new Date()).next);
+      renderHero(getPartition().next);
     });
   });
 
@@ -354,7 +364,7 @@ function renderPrinciple() {
 }
 
 function renderAll() {
-  const { next, doneToday } = partitionTasks(tasks, new Date());
+  const { next, doneToday } = getPartition();
   renderGroupList();
   renderComposerGroups();
   if (currentView === 'home') {
@@ -395,9 +405,18 @@ function completeTask(id) {
   const task = tasks.find((t) => t.id === id);
   if (!task) return;
   task.completedAt = new Date().toISOString();
+  if (task.id === activeTaskId) activeTaskId = null;
   saveState();
   renderAll();
   celebrate();
+}
+
+function makeActive(id) {
+  const task = tasks.find((t) => t.id === id);
+  if (!task || task.completedAt) return;
+  activeTaskId = id;
+  saveState();
+  setView('home');
 }
 
 function promoteTask(id) {
@@ -410,6 +429,7 @@ function promoteTask(id) {
 }
 
 function deleteTask(id) {
+  if (id === activeTaskId) activeTaskId = null;
   tasks = tasks.filter((t) => t.id !== id);
   saveState();
   renderAll();
@@ -739,6 +759,7 @@ function init() {
   groups = saved ? saved.groups : [];
   themePreference = saved ? saved.theme : null;
   userName = saved ? saved.userName : '';
+  activeTaskId = saved ? saved.activeTaskId : null;
   langPreference = saved
     ? saved.lang
     : (navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en');
@@ -781,7 +802,7 @@ function init() {
 
   setInterval(() => {
     if (currentView !== 'home') return;
-    const { doneToday } = partitionTasks(tasks, new Date());
+    const { doneToday } = getPartition();
     renderGreeting(doneToday.length);
   }, 60_000);
 }

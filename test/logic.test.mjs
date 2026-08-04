@@ -67,6 +67,23 @@ test('partitionTasks splits next, backlog and done-today', () => {
   assert.deepEqual(doneToday.map((t) => t.title), ['done']);
 });
 
+test('partitionTasks makes the pinned task the active next task', () => {
+  const a = task({ title: 'a', priority: 'high', now: new Date(2026, 7, 2, 8) });
+  const b = task({ title: 'b', priority: 'low', now: new Date(2026, 7, 2, 9) });
+  const { next, backlog } = partitionTasks([a, b], NOON, b.id);
+  assert.equal(next.title, 'b');
+  assert.deepEqual(backlog.map((t) => t.title), ['a']);
+});
+
+test('partitionTasks ignores a stale or completed pinned id', () => {
+  const a = task({ title: 'a', priority: 'high', now: new Date(2026, 7, 2, 8) });
+  const done = task({ title: 'done', completedAt: new Date(2026, 7, 2, 9).toISOString() });
+  const { next, backlog } = partitionTasks([a, done], NOON, done.id);
+  assert.equal(next.title, 'a');
+  assert.deepEqual(backlog.map((t) => t.title), []);
+  assert.equal(partitionTasks([a], NOON, 'does-not-exist').next.title, 'a');
+});
+
 test('pruneOldCompletions drops completed tasks from earlier days', () => {
   const kept = task({ title: 'today', completedAt: new Date(2026, 7, 2, 9).toISOString() });
   const dropped = task({ title: 'old', completedAt: new Date(2026, 7, 1, 9).toISOString() });
