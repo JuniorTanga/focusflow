@@ -302,7 +302,7 @@ function renderBacklog() {
   $('backlogList').querySelectorAll('.backlog-item').forEach((el) => {
     el.addEventListener('click', (e) => {
       if (e.target.closest('[data-del]') || e.target.closest('[data-act]') || e.target.closest('.backlog-group-select')) return;
-      promoteTask(el.dataset.id);
+      makeActive(el.dataset.id);
     });
   });
   $('backlogList').querySelectorAll('[data-del]').forEach((btn) => {
@@ -419,15 +419,6 @@ function makeActive(id) {
   setView('home');
 }
 
-function promoteTask(id) {
-  const task = tasks.find((t) => t.id === id);
-  if (!task) return;
-  task.due = 'today';
-  task.priority = 'high';
-  saveState();
-  renderAll();
-}
-
 function deleteTask(id) {
   if (id === activeTaskId) activeTaskId = null;
   tasks = tasks.filter((t) => t.id !== id);
@@ -478,6 +469,7 @@ function confirmReschedule() {
   const task = tasks.find((t) => t.id === modalTaskId);
   if (!task || !validateReason($('reasonInput').value)) return;
   task.due = modalDue;
+  task.lastPostponeReason = $('reasonInput').value.trim();
   closeReschedule();
   saveState();
   renderAll();
@@ -631,7 +623,7 @@ function setupShortcuts() {
 
     if (e.key === 'Escape') {
       if ($('rescheduleModal').classList.contains('active')) closeReschedule();
-      else if (!$('groupForm').hidden) {
+      else if (!$('groupForm').hidden && $('groupForm').contains(document.activeElement)) {
         $('groupForm').hidden = true;
         $('groupInput').value = '';
       }
@@ -680,6 +672,7 @@ function setupSettings() {
     tasks = [];
     groups = [];
     userName = '';
+    activeTaskId = null;
     activeGroupId = null;
     currentView = 'home';
     saveState();

@@ -30,6 +30,7 @@ test('createTask applies defaults', () => {
   assert.equal(t.timebox, null);
   assert.equal(t.completedAt, null);
   assert.equal(t.groupId, null);
+  assert.equal(t.lastPostponeReason, null);
   assert.ok(t.id);
 });
 

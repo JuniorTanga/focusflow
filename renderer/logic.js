@@ -26,7 +26,7 @@ export function dayNumber(now) {
   return Math.floor(localMidnight.getTime() / 86400000);
 }
 
-export function createTask({ title, whenWhere = null, priority = 'medium', timebox = null, due = 'today', completedAt = null, groupId = null, now = new Date() }) {
+export function createTask({ title, whenWhere = null, priority = 'medium', timebox = null, due = 'today', completedAt = null, groupId = null, lastPostponeReason = null, now = new Date() }) {
   return {
     id: newId(),
     title,
@@ -35,6 +35,7 @@ export function createTask({ title, whenWhere = null, priority = 'medium', timeb
     timebox,
     due,
     groupId,
+    lastPostponeReason,
     createdAt: now.toISOString(),
     completedAt
   };
@@ -106,7 +107,11 @@ export function greetingFor(now = new Date(), doneCount = 0, name = null, lang =
   const pool = dict[bucket][stateClass(doneCount)];
   const pick = pool[dayNumber(now) % pool.length];
   const label = name ? pick.label.replace(/\.$/, '') + `, ${name}.` : pick.label;
-  return { bucket, label, line: pick.line };
+  return {
+    bucket,
+    label: label.replace(/\bN\b/g, String(doneCount)),
+    line: pick.line.replace(/\bN\b/g, String(doneCount))
+  };
 }
 
 export function principleOfDay(now = new Date(), lang = 'en') {

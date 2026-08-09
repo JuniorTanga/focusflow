@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 
 function createWindow() {
@@ -8,7 +8,6 @@ function createWindow() {
     minWidth: 900,
     minHeight: 560,
     frame: false,
-    backgroundColor: '#f7f2ec',
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -30,7 +29,7 @@ function createWindow() {
   win.on('unmaximize', emitMaxState);
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    require('electron').shell.openExternal(url);
+    shell.openExternal(url);
     return { action: 'deny' };
   });
 
@@ -41,26 +40,38 @@ function createWindow() {
   return win;
 }
 
-app.whenReady().then(() => {
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.focus();
   });
-});
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+  app.whenReady().then(() => {
+    createWindow();
 
-ipcMain.handle('window:minimize', (event) => {
-  BrowserWindow.fromWebContents(event.sender)?.minimize();
-});
-ipcMain.handle('window:toggle-maximize', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
-  if (!win) return;
-  win.isMaximized() ? win.unmaximize() : win.maximize();
-});
-ipcMain.handle('window:close', (event) => {
-  BrowserWindow.fromWebContents(event.sender)?.close();
-});
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+
+  ipcMain.handle('window:minimize', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.minimize();
+  });
+  ipcMain.handle('window:toggle-maximize', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    win.isMaximized() ? win.unmaximize() : win.maximize();
+  });
+  ipcMain.handle('window:close', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+}
