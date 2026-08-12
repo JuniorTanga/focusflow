@@ -85,6 +85,26 @@ test('partitionTasks ignores a stale or completed pinned id', () => {
   assert.equal(partitionTasks([a], NOON, 'does-not-exist').next.title, 'a');
 });
 
+test('partitionTasks does not promote a task deferred to tomorrow/week', () => {
+  const today = task({ title: 't', due: 'today', now: new Date(2026, 7, 2, 8) });
+  const tomorrow = task({ title: 'tm', due: 'tomorrow', now: new Date(2026, 7, 2, 9) });
+  const week = task({ title: 'w', due: 'week', now: new Date(2026, 7, 2, 10) });
+  const { next, backlog } = partitionTasks([tomorrow, week, today], NOON);
+  assert.equal(next.title, 't');
+  assert.deepEqual(backlog.map((t) => t.title), ['tm', 'w']);
+  const only = partitionTasks([tomorrow], NOON);
+  assert.equal(only.next, null);
+  assert.deepEqual(only.backlog.map((t) => t.title), ['tm']);
+});
+
+test('partitionTasks keeps a pinned deferred task as the active next task', () => {
+  const a = task({ title: 'a', due: 'today', now: new Date(2026, 7, 2, 8) });
+  const w = task({ title: 'w', due: 'week', now: new Date(2026, 7, 2, 9) });
+  const { next, backlog } = partitionTasks([a, w], NOON, w.id);
+  assert.equal(next.title, 'w');
+  assert.deepEqual(backlog.map((t) => t.title), ['a']);
+});
+
 test('pruneOldCompletions drops completed tasks from earlier days', () => {
   const kept = task({ title: 'today', completedAt: new Date(2026, 7, 2, 9).toISOString() });
   const dropped = task({ title: 'old', completedAt: new Date(2026, 7, 1, 9).toISOString() });
