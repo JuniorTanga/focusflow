@@ -97,6 +97,15 @@ test('partitionTasks does not promote a task deferred to tomorrow/week', () => {
   assert.deepEqual(only.backlog.map((t) => t.title), ['tm']);
 });
 
+test('partitionTasks promotes another due-today task when the hero is deferred', () => {
+  const a = task({ title: 'a', due: 'today', priority: 'high', now: new Date(2026, 7, 2, 8) });
+  const b = task({ title: 'b', due: 'today', priority: 'low', now: new Date(2026, 7, 2, 9) });
+  const deferredA = { ...a, due: 'tomorrow' };
+  const { next, backlog } = partitionTasks([deferredA, b], NOON);
+  assert.equal(next.title, 'b');
+  assert.deepEqual(backlog.map((t) => t.title), ['a']);
+});
+
 test('partitionTasks keeps a pinned deferred task as the active next task', () => {
   const a = task({ title: 'a', due: 'today', now: new Date(2026, 7, 2, 8) });
   const w = task({ title: 'w', due: 'week', now: new Date(2026, 7, 2, 9) });
