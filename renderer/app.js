@@ -470,7 +470,8 @@ function confirmReschedule() {
   if (!task || !validateReason($('reasonInput').value)) return;
   task.due = modalDue;
   task.lastPostponeReason = $('reasonInput').value.trim();
-  if (task.id === activeTaskId && modalDue !== 'today') activeTaskId = null;
+  task.postponedAt = new Date().toISOString();
+  if (task.id === activeTaskId) activeTaskId = null;
   closeReschedule();
   saveState();
   renderAll();

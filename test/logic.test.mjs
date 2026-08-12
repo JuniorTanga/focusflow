@@ -114,6 +114,31 @@ test('partitionTasks keeps a pinned deferred task as the active next task', () =
   assert.deepEqual(backlog.map((t) => t.title), ['a']);
 });
 
+test('a task postponed later-today leaves the hero and lets another today task promote', () => {
+  const a = task({ title: 'a', priority: 'high', now: new Date(2026, 7, 2, 8) });
+  const b = task({ title: 'b', priority: 'low', now: new Date(2026, 7, 2, 9) });
+  const postponedA = { ...a, postponedAt: new Date(2026, 7, 2, 10).toISOString() };
+  const { next, backlog } = partitionTasks([postponedA, b], NOON);
+  assert.equal(next.title, 'b');
+  assert.deepEqual(backlog.map((t) => t.title), ['a']);
+});
+
+test('a postponed-today task returns to the hero the next day', () => {
+  const a = task({ title: 'a', now: new Date(2026, 7, 2, 8) });
+  const postponedYesterday = { ...a, postponedAt: new Date(2026, 7, 1, 9).toISOString() };
+  const { next } = partitionTasks([postponedYesterday], NOON);
+  assert.equal(next.title, 'a');
+});
+
+test('pinning a postponed-today task forces it back to the hero', () => {
+  const a = task({ title: 'a', now: new Date(2026, 7, 2, 8) });
+  const b = task({ title: 'b', now: new Date(2026, 7, 2, 9) });
+  const postponedA = { ...a, postponedAt: new Date(2026, 7, 2, 10).toISOString() };
+  const { next, backlog } = partitionTasks([postponedA, b], NOON, a.id);
+  assert.equal(next.title, 'a');
+  assert.deepEqual(backlog.map((t) => t.title), ['b']);
+});
+
 test('pruneOldCompletions drops completed tasks from earlier days', () => {
   const kept = task({ title: 'today', completedAt: new Date(2026, 7, 2, 9).toISOString() });
   const dropped = task({ title: 'old', completedAt: new Date(2026, 7, 1, 9).toISOString() });

@@ -26,7 +26,7 @@ export function dayNumber(now) {
   return Math.floor(localMidnight.getTime() / 86400000);
 }
 
-export function createTask({ title, whenWhere = null, priority = 'medium', timebox = null, due = 'today', completedAt = null, groupId = null, lastPostponeReason = null, now = new Date() }) {
+export function createTask({ title, whenWhere = null, priority = 'medium', timebox = null, due = 'today', completedAt = null, groupId = null, lastPostponeReason = null, postponedAt = null, now = new Date() }) {
   return {
     id: newId(),
     title,
@@ -36,6 +36,7 @@ export function createTask({ title, whenWhere = null, priority = 'medium', timeb
     due,
     groupId,
     lastPostponeReason,
+    postponedAt,
     createdAt: now.toISOString(),
     completedAt
   };
@@ -67,7 +68,8 @@ export function sortTasks(tasks) {
 export function partitionTasks(tasks, now = new Date(), activeTaskId = null) {
   const incomplete = sortTasks(tasks.filter((t) => !t.completedAt));
   const active = activeTaskId ? incomplete.find((t) => t.id === activeTaskId) ?? null : null;
-  const todayPool = incomplete.filter((t) => (t.due ?? 'today') === 'today');
+  const postponedToday = (t) => t.postponedAt && isSameDay(new Date(t.postponedAt), now);
+  const todayPool = incomplete.filter((t) => (t.due ?? 'today') === 'today' && !postponedToday(t));
   const next = active ?? todayPool[0] ?? null;
   const doneToday = tasks
     .filter((t) => t.completedAt && isSameDay(new Date(t.completedAt), now))
