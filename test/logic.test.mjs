@@ -85,16 +85,16 @@ test('partitionTasks ignores a stale or completed pinned id', () => {
   assert.equal(partitionTasks([a], NOON, 'does-not-exist').next.title, 'a');
 });
 
-test('partitionTasks does not promote a task deferred to tomorrow/week', () => {
+test('a deferred task is skipped while a today task exists, but returns when alone', () => {
   const today = task({ title: 't', due: 'today', now: new Date(2026, 7, 2, 8) });
   const tomorrow = task({ title: 'tm', due: 'tomorrow', now: new Date(2026, 7, 2, 9) });
   const week = task({ title: 'w', due: 'week', now: new Date(2026, 7, 2, 10) });
-  const { next, backlog } = partitionTasks([tomorrow, week, today], NOON);
-  assert.equal(next.title, 't');
-  assert.deepEqual(backlog.map((t) => t.title), ['tm', 'w']);
-  const only = partitionTasks([tomorrow], NOON);
-  assert.equal(only.next, null);
-  assert.deepEqual(only.backlog.map((t) => t.title), ['tm']);
+  const mixed = partitionTasks([tomorrow, week, today], NOON);
+  assert.equal(mixed.next.title, 't');
+  assert.deepEqual(mixed.backlog.map((t) => t.title), ['tm', 'w']);
+  const alone = partitionTasks([tomorrow], NOON);
+  assert.equal(alone.next.title, 'tm');
+  assert.deepEqual(alone.backlog, []);
 });
 
 test('partitionTasks promotes another due-today task when the hero is deferred', () => {
@@ -121,6 +121,16 @@ test('a task postponed later-today leaves the hero and lets another today task p
   const { next, backlog } = partitionTasks([postponedA, b], NOON);
   assert.equal(next.title, 'b');
   assert.deepEqual(backlog.map((t) => t.title), ['a']);
+});
+
+test('hero falls back to a postponed task when all other tasks are done', () => {
+  const a = task({ title: 'a', priority: 'high', now: new Date(2026, 7, 2, 8) });
+  const postponedA = { ...a, postponedAt: new Date(2026, 7, 2, 10).toISOString() };
+  const b = task({ title: 'b', priority: 'low', now: new Date(2026, 7, 2, 9) });
+  const withB = partitionTasks([postponedA, b], NOON);
+  assert.equal(withB.next.title, 'b');
+  const alone = partitionTasks([postponedA], NOON);
+  assert.equal(alone.next.title, 'a');
 });
 
 test('a postponed-today task returns to the hero the next day', () => {

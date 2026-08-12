@@ -70,7 +70,7 @@ export function partitionTasks(tasks, now = new Date(), activeTaskId = null) {
   const active = activeTaskId ? incomplete.find((t) => t.id === activeTaskId) ?? null : null;
   const postponedToday = (t) => t.postponedAt && isSameDay(new Date(t.postponedAt), now);
   const todayPool = incomplete.filter((t) => (t.due ?? 'today') === 'today' && !postponedToday(t));
-  const next = active ?? todayPool[0] ?? null;
+  const next = active ?? todayPool[0] ?? incomplete[0] ?? null;
   const doneToday = tasks
     .filter((t) => t.completedAt && isSameDay(new Date(t.completedAt), now))
     .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt));
