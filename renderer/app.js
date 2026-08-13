@@ -5,6 +5,7 @@ import {
   pruneOldCompletions,
   validateReason,
   resolveDueForReschedule,
+  guessDue,
   greetingFor,
   principleOfDay,
   timeBucket
@@ -387,15 +388,18 @@ function addTaskFromComposer() {
     input.focus();
     return;
   }
+  const guess = guessDue($('taskContext').value);
   tasks.push(createTask({
     title,
     priority: composing.priority,
     timebox: composing.timebox,
     whenWhere: $('taskContext').value.trim() || null,
-    groupId: composing.groupId || null
+    groupId: composing.groupId || null,
+    due: guess ?? 'today'
   }));
   input.value = '';
   $('taskContext').value = '';
+  updateContextHint();
   saveState();
   renderAll();
   input.focus();
@@ -536,11 +540,24 @@ function setComposerDetails(open) {
   $('detailsToggle').setAttribute('aria-expanded', String(open));
 }
 
+function updateContextHint() {
+  const due = guessDue($('taskContext').value);
+  const hint = $('contextHint');
+  if (!due) {
+    hint.hidden = true;
+    return;
+  }
+  hint.textContent = t('composer.guessHint').replace('{due}', t('due.' + due));
+  hint.hidden = false;
+}
+
 function setupComposer() {
   $('composerForm').addEventListener('submit', (e) => {
     e.preventDefault();
     addTaskFromComposer();
   });
+
+  $('taskContext').addEventListener('input', updateContextHint);
 
   const detailsToggle = $('detailsToggle');
   detailsToggle.innerHTML = icon('chevronUp');

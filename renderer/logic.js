@@ -90,6 +90,34 @@ export function resolveDueForReschedule(due) {
   return due === 'tomorrow' || due === 'week' ? due : 'today';
 }
 
+const DUE_HINTS = {
+  week: [
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+    'this week', 'next week', 'this weekend', 'the weekend', 'weekend',
+    'by friday', 'end of week', 'end of the week', 'eow',
+    'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche',
+    'cette semaine', 'la semaine prochaine', 'ce week-end', 'le week-end', 'week-end',
+    'fin de semaine'
+  ],
+  tomorrow: ['tomorrow', 'tmrw', 'demain'],
+  today: [
+    'later today', 'today', 'tonight', 'this afternoon', 'this evening', 'this morning',
+    'after lunch', 'after work', 'asap', 'right now', 'now',
+    "aujourd'hui", 'ce soir', 'cet après-midi', 'cette après-midi', 'ce matin',
+    'après le déjeuner', 'après le travail', 'maintenant', 'tout de suite'
+  ]
+};
+
+export function guessDue(note = '') {
+  const text = ' ' + String(note).toLowerCase().replace(/[\s,.;:!?—–]+/g, ' ') + ' ';
+  const inDays = text.match(/\b(in|dans)\s+(\d+)\s+(days?|day|jours?|jour)\b/);
+  if (inDays) return parseInt(inDays[2], 10) === 1 ? 'tomorrow' : 'week';
+  for (const bucket of ['week', 'tomorrow', 'today']) {
+    if (DUE_HINTS[bucket].some((w) => text.includes(' ' + w + ' '))) return bucket;
+  }
+  return null;
+}
+
 export function timeBucket(now = new Date()) {
   const h = now.getHours();
   if (h >= 5 && h < 12) return 'morning';

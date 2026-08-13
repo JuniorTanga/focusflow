@@ -8,6 +8,7 @@ import {
   pruneOldCompletions,
   validateReason,
   resolveDueForReschedule,
+  guessDue,
   greetingFor,
   principleOfDay,
   timeBucket,
@@ -168,6 +169,22 @@ test('resolveDueForReschedule maps to valid buckets', () => {
   assert.equal(resolveDueForReschedule('week'), 'week');
   assert.equal(resolveDueForReschedule('today'), 'today');
   assert.equal(resolveDueForReschedule('never'), 'today');
+});
+
+test('guessDue reads date clues from when/where notes', () => {
+  assert.equal(guessDue('At my desk, after lunch'), 'today');
+  assert.equal(guessDue('Send report tomorrow at the office'), 'tomorrow');
+  assert.equal(guessDue('Finish this by friday'), 'week');
+  assert.equal(guessDue('This weekend'), 'week');
+  assert.equal(guessDue('Call her in 1 day'), 'tomorrow');
+  assert.equal(guessDue('Ship it in 3 days'), 'week');
+  assert.equal(guessDue('demain matin'), 'tomorrow');
+  assert.equal(guessDue('Rendu vendredi prochain'), 'week');
+  assert.equal(guessDue('Ce soir à la maison'), 'today');
+  assert.equal(guessDue('à mon bureau'), null);
+  assert.equal(guessDue('At my desk'), null);
+  assert.equal(guessDue(''), null);
+  assert.equal(guessDue('   '), null);
 });
 
 test('timeBucket matches the hour', () => {
