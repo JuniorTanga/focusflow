@@ -61,7 +61,7 @@ function overdueDays(task, now) {
   return Math.max(0, keyDays(dateKey(now)) - keyDays(task.dueDate));
 }
 
-export function createTask({ title, whenWhere = null, priority = 'medium', timebox = null, due = 'today', completedAt = null, groupId = null, lastPostponeReason = null, postponedAt = null, now = new Date() }) {
+export function createTask({ title, whenWhere = null, priority = 'medium', timebox = null, due = 'today', completedAt = null, groupId = null, lastPostponeReason = null, postponedAt = null, recurrence = null, routineId = null, dueDate = null, now = new Date() }) {
   return {
     id: newId(),
     title,
@@ -69,10 +69,12 @@ export function createTask({ title, whenWhere = null, priority = 'medium', timeb
     priority,
     timebox,
     due,
-    dueDate: dueDateFor(due, now),
+    dueDate: dueDate ?? dueDateFor(due, now),
     groupId,
     lastPostponeReason,
     postponedAt,
+    recurrence,
+    routineId,
     createdAt: now.toISOString(),
     completedAt
   };
@@ -85,6 +87,85 @@ export function createGroup({ name, color = null, now = new Date() }) {
     color,
     createdAt: now.toISOString()
   };
+}
+
+export function createRoutine({ name, whenWhere = null, priority = 'medium', timebox = null, groupId = null, every = 'daily', on = null, step = 1, enabled = true, now = new Date() }) {
+  const day = on != null
+    ? on
+    : every === 'weekly' ? now.getDay()
+      : every === 'monthly' ? now.getDate()
+        : null;
+  return {
+    id: newId(),
+    name: String(name ?? '').trim(),
+    whenWhere,
+    priority,
+    timebox,
+    groupId,
+    every,
+    on: every === 'weekly' || every === 'monthly' ? day : null,
+    step: every === 'period' ? Math.max(1, Number(step) || 1) : null,
+    enabled: enabled !== false,
+    createdAt: now.toISOString()
+  };
+}
+
+export function nextOccurrenceDate(r, after = new Date()) {
+  const d = new Date(after);
+  d.setHours(0, 0, 0, 0);
+  const every = r.every;
+  if (every === 'period') return addDays(d, Math.max(1, Number(r.step) || 1));
+  if (every === 'weekly') {
+    const day = Number(r.on);
+    let delta = (day - d.getDay() + 7) % 7;
+    if (delta === 0) delta = 7;
+    return addDays(d, delta);
+  }
+  if (every === 'monthly') {
+    const target = Math.min(31, Math.max(1, Number(r.on) || 1));
+    const lastOf = (yy, mm) => new Date(yy, mm + 1, 0).getDate();
+    let y = d.getFullYear();
+    let m = d.getMonth();
+    let day = Math.min(target, lastOf(y, m));
+    let nxt = new Date(y, m, day);
+    if (nxt <= d) {
+      m += 1;
+      if (m > 11) { m = 0; y += 1; }
+      day = Math.min(target, lastOf(y, m));
+      nxt = new Date(y, m, day);
+    }
+    return nxt;
+  }
+  return addDays(d, 1);
+}
+
+function recurrenceSnapshot(r) {
+  return { every: r.every, on: r.on, step: r.step };
+}
+
+function occurrenceFromRoutine(routine, due, dueDate, now) {
+  return createTask({
+    title: routine.name,
+    whenWhere: routine.whenWhere,
+    priority: routine.priority,
+    timebox: routine.timebox,
+    groupId: routine.groupId,
+    due,
+    dueDate,
+    recurrence: recurrenceSnapshot(routine),
+    routineId: routine.id,
+    now
+  });
+}
+
+export function firstOccurrence(routine, now = new Date()) {
+  return occurrenceFromRoutine(routine, 'today', dateKey(now), now);
+}
+
+export function spawnOccurrence(routine, now = new Date()) {
+  const dueDate = dateKey(nextOccurrenceDate(routine, now));
+  const due = dueDate === dateKey(addDays(now, 1)) ? 'tomorrow' : 'week';
+  return occurrenceFromRoutine(routine, due, dueDate, now);
 }
 
 function bucketRank(task) {
@@ -205,6 +286,19 @@ function legacyDueDate(t, due, now) {
   return dateKey(base);
 }
 
+export function dueBucket(task, now = new Date()) {
+  const due = task.due && task.due in DUE_ORDER ? task.due : 'today';
+  if (due !== 'week') return due;
+  if (!task.dueDate) return 'week';
+  if (task.dueDate <= dateKey(endOfWeek(now))) return 'week';
+  return 'later';
+}
+
+export function dueDateLabel(dueKey, lang = 'en') {
+  const [y, m, d] = String(dueKey).split('-').map(Number);
+  return new Intl.DateTimeFormat(lang === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'short' }).format(new Date(y, m - 1, d));
+}
+
 export function rolloverDue(tasks, now = new Date()) {
   const todayK = dateKey(now);
   let changed = false;
@@ -215,6 +309,7 @@ export function rolloverDue(tasks, now = new Date()) {
     let newDue = due;
     if (due === 'tomorrow' && dueDate <= todayK) newDue = 'today';
     else if (due === 'week' && dueDate < todayK) newDue = 'today';
+    if (t.recurrence && due !== 'today' && dueDate <= todayK) newDue = 'today';
     if (t.dueDate === dueDate && newDue === due) return t;
     changed = true;
     return { ...t, due: newDue, dueDate };

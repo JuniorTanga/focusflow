@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createTask,
   createGroup,
+  createRoutine,
   sortTasks,
   partitionTasks,
   pruneOldCompletions,
@@ -11,10 +12,15 @@ import {
   guessDue,
   rolloverDue,
   dueDateFor,
+  dueBucket,
+  dueDateLabel,
   greetingFor,
   principleOfDay,
   timeBucket,
-  dayNumber
+  dayNumber,
+  nextOccurrenceDate,
+  firstOccurrence,
+  spawnOccurrence
 } from '../renderer/logic.js';
 import { GREETINGS, PRINCIPLES } from '../renderer/i18n.js';
 
@@ -339,4 +345,118 @@ test('a pinned task overrides overdue ordering', () => {
   const fresh = task({ title: 'fresh', now: new Date(2026, 7, 3, 9) });
   const { next } = partitionTasks([lateWeek, fresh], new Date(2026, 7, 3, 9), fresh.id);
   assert.equal(next.title, 'fresh');
+});
+
+test('createTask defaults recurrence and routineId to null', () => {
+  const t = task({});
+  assert.equal(t.recurrence, null);
+  assert.equal(t.routineId, null);
+});
+
+test('createTask accepts an explicit dueDate and a recurrence snapshot', () => {
+  const t = task({ due: 'week', dueDate: '2026-09-01', recurrence: { every: 'monthly', on: 1, step: null }, routineId: 'r1' });
+  assert.equal(t.dueDate, '2026-09-01');
+  assert.deepEqual(t.recurrence, { every: 'monthly', on: 1, step: null });
+  assert.equal(t.routineId, 'r1');
+});
+
+test('createRoutine defaults cadence day, weekly to this weekday, monthly to today', () => {
+  const daily = createRoutine({ name: 'Water', every: 'daily', now: new Date(2026, 7, 2, 9) });
+  assert.equal(daily.every, 'daily');
+  assert.equal(daily.on, null);
+  assert.equal(daily.step, null);
+  assert.equal(daily.enabled, true);
+  const weekly = createRoutine({ name: 'W', every: 'weekly', now: new Date(2026, 7, 2, 9) });
+  assert.equal(weekly.on, 0);
+  const monthly = createRoutine({ name: 'M', every: 'monthly', now: new Date(2026, 7, 2, 9) });
+  assert.equal(monthly.on, 2);
+  const period = createRoutine({ name: 'P', every: 'period', step: 3, now: new Date(2026, 7, 2, 9) });
+  assert.equal(period.step, 3);
+});
+
+test('nextOccurrenceDate advances daily and every-N-days', () => {
+  const daily = nextOccurrenceDate({ every: 'daily' }, new Date(2026, 7, 2, 20, 30));
+  assert.deepEqual([daily.getFullYear(), daily.getMonth(), daily.getDate()], [2026, 7, 3]);
+  const period = nextOccurrenceDate({ every: 'period', step: 3 }, new Date(2026, 7, 2, 20, 30));
+  assert.deepEqual([period.getFullYear(), period.getMonth(), period.getDate()], [2026, 7, 5]);
+});
+
+test('nextOccurrenceDate weekly jumps to the chosen weekday, never today', () => {
+  const wednesday = new Date(2026, 7, 5, 9);
+  const sunday = nextOccurrenceDate({ every: 'weekly', on: 0 }, wednesday);
+  assert.deepEqual([sunday.getFullYear(), sunday.getMonth(), sunday.getDate()], [2026, 7, 9]);
+  const monday = nextOccurrenceDate({ every: 'weekly', on: 1 }, wednesday);
+  assert.deepEqual([monday.getFullYear(), monday.getMonth(), monday.getDate()], [2026, 7, 10]);
+  const sameDay = nextOccurrenceDate({ every: 'weekly', on: 3 }, wednesday);
+  assert.deepEqual([sameDay.getFullYear(), sameDay.getMonth(), sameDay.getDate()], [2026, 7, 12]);
+});
+
+test('nextOccurrenceDate monthly keeps the chosen day and clamps to the month end', () => {
+  const first = nextOccurrenceDate({ every: 'monthly', on: 1 }, new Date(2026, 7, 1, 9));
+  assert.deepEqual([first.getFullYear(), first.getMonth(), first.getDate()], [2026, 8, 1]);
+  const mid = nextOccurrenceDate({ every: 'monthly', on: 1 }, new Date(2026, 7, 15, 9));
+  assert.deepEqual([mid.getFullYear(), mid.getMonth(), mid.getDate()], [2026, 8, 1]);
+  const clamp = nextOccurrenceDate({ every: 'monthly', on: 31 }, new Date(2026, 1, 1, 9));
+  assert.deepEqual([clamp.getFullYear(), clamp.getMonth(), clamp.getDate()], [2026, 1, 28]);
+  const clampNext = nextOccurrenceDate({ every: 'monthly', on: 31 }, new Date(2026, 1, 28, 9));
+  assert.deepEqual([clampNext.getFullYear(), clampNext.getMonth(), clampNext.getDate()], [2026, 2, 31]);
+});
+
+test('firstOccurrence is due today, spawnOccurrence lands tomorrow or in the week', () => {
+  const routine = createRoutine({ name: 'Water', every: 'daily', now: new Date(2026, 7, 2, 9) });
+  const first = firstOccurrence(routine, new Date(2026, 7, 2, 9));
+  assert.equal(first.due, 'today');
+  assert.equal(first.dueDate, '2026-08-02');
+  assert.equal(first.title, 'Water');
+  assert.deepEqual(first.recurrence, { every: 'daily', on: null, step: null });
+  assert.equal(first.routineId, routine.id);
+
+  const next = spawnOccurrence(routine, new Date(2026, 7, 2, 9));
+  assert.equal(next.due, 'tomorrow');
+  assert.equal(next.dueDate, '2026-08-03');
+
+  const weekly = spawnOccurrence(createRoutine({ name: 'W', every: 'weekly', on: 0, now: new Date(2026, 7, 2, 9) }), new Date(2026, 7, 2, 9));
+  assert.equal(weekly.due, 'week');
+  assert.equal(weekly.dueDate, '2026-08-09');
+});
+
+test('a routine occurrence is promoted to today on the day its dueDate arrives', () => {
+  const tomorrow = task({ title: 't', due: 'tomorrow', recurrence: { every: 'daily' }, now: new Date(2026, 7, 2, 9) });
+  const res = rolloverDue([tomorrow], new Date(2026, 7, 3, 7));
+  assert.equal(res.changed, true);
+  assert.equal(res.tasks[0].due, 'today');
+});
+
+test('a far-future routine occurrence is promoted exactly on its due date', () => {
+  const routine = createRoutine({ name: 'W', every: 'weekly', on: 0, now: new Date(2026, 7, 2, 9) });
+  const occ = spawnOccurrence(routine, new Date(2026, 7, 2, 9));
+  const before = rolloverDue([occ], new Date(2026, 7, 8, 9));
+  assert.equal(before.changed, false);
+  assert.equal(before.tasks[0].due, 'week');
+  const onDay = rolloverDue([occ], new Date(2026, 7, 9, 7));
+  assert.equal(onDay.changed, true);
+  assert.equal(onDay.tasks[0].due, 'today');
+});
+
+test('routine rollover promotion does not shift a normal week task on its week-end day', () => {
+  const normal = task({ title: 'n', due: 'week', now: new Date(2026, 7, 6, 9) });
+  const res = rolloverDue([normal], new Date(2026, 7, 9, 7));
+  assert.equal(res.changed, false);
+  assert.equal(res.tasks[0].due, 'week');
+});
+
+test('dueBucket classifies by stored bucket, with real dates only beyond the week', () => {
+  const now = new Date(2026, 7, 5, 9);
+  assert.equal(dueBucket({ due: 'today', dueDate: '2026-08-05' }, now), 'today');
+  assert.equal(dueBucket({ due: 'tomorrow', dueDate: '2026-08-06' }, now), 'tomorrow');
+  assert.equal(dueBucket({ due: 'today', dueDate: '2026-08-04' }, now), 'today');
+  assert.equal(dueBucket({ due: 'week', dueDate: '2026-08-09' }, now), 'week');
+  assert.equal(dueBucket({ due: 'week', dueDate: '2026-09-12' }, now), 'later');
+  assert.equal(dueBucket({ due: 'week' }, now), 'week');
+  assert.equal(dueBucket({}, now), 'today');
+});
+
+test('dueDateLabel formats far-future dates for either language', () => {
+  assert.equal(dueDateLabel('2026-08-03', 'en'), '3 Aug');
+  assert.equal(dueDateLabel('2026-08-03', 'fr'), '3 août');
 });

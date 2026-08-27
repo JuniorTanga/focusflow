@@ -23,6 +23,7 @@
       <nav class="side-nav" aria-label="Primary">
         <button class="nav-item" data-view="home" aria-pressed="true" id="navHome"></button>
         <button class="nav-item" data-view="backlog" aria-pressed="false" id="navBacklog"></button>
+        <button class="nav-item" data-view="routines" aria-pressed="false" id="navRoutines"></button>
         <button class="nav-item" data-view="settings" aria-pressed="false" id="navSettings"></button>
       </nav>
 
@@ -110,6 +111,88 @@
 
           <div class="section-label" id="doneLabel"></div>
           <div class="done-list" id="doneList"></div>
+        </section>
+
+        <section class="view" id="view-routines" hidden>
+          <div class="view-head">
+            <h1 class="view-title" data-i18n="routines.title">Routines</h1>
+            <p class="view-sub" id="routinesSubLabel"></p>
+          </div>
+
+          <section class="routine-creator" id="routineCreator">
+            <form class="routine-form" id="routineForm">
+              <div class="field">
+                <div class="field-label" data-i18n="routines.name">Routine name</div>
+                <input class="composer-input" id="routineName" type="text"
+                  data-i18n-placeholder="routines.namePlaceholder" placeholder="e.g. Water the plants" autocomplete="off" spellcheck="false" />
+              </div>
+
+              <div class="field">
+                <div class="field-label" data-i18n="composer.whenWhere">When &amp; where</div>
+                <input class="composer-input-small" id="routineContext" type="text"
+                  data-i18n-placeholder="composer.contextPlaceholder" placeholder="e.g. At my desk, after lunch" autocomplete="off" spellcheck="false" />
+              </div>
+
+              <div class="routine-creator-grid">
+                <div class="field">
+                  <div class="field-label" data-i18n="composer.priority">Priority</div>
+                  <div class="seg" id="routinePrioritySeg" role="group" data-i18n-aria="composer.priority" aria-label="Priority">
+                    <button type="button" class="seg-btn" data-value="high">High</button>
+                    <button type="button" class="seg-btn" data-value="medium" aria-pressed="true">Medium</button>
+                    <button type="button" class="seg-btn" data-value="low">Low</button>
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="field-label" data-i18n="composer.timebox">Time-box</div>
+                  <div class="seg" id="routineTimeboxSeg" role="group" data-i18n-aria="composer.timebox" aria-label="Time-box">
+                    <button type="button" class="seg-btn" data-value="5">5 min</button>
+                    <button type="button" class="seg-btn" data-value="15">15 min</button>
+                    <button type="button" class="seg-btn" data-value="30" aria-pressed="true">30 min</button>
+                    <button type="button" class="seg-btn" data-value="60">60 min</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field">
+                <div class="field-label" data-i18n="routines.cadence">Cadence</div>
+                <div class="seg" id="routineCadenceSeg" role="group" data-i18n-aria="routines.cadence" aria-label="Cadence">
+                  <button type="button" class="seg-btn" data-value="daily" aria-pressed="true">Every day</button>
+                  <button type="button" class="seg-btn" data-value="weekly">Weekly</button>
+                  <button type="button" class="seg-btn" data-value="monthly">Monthly</button>
+                  <button type="button" class="seg-btn" data-value="period">Every N days</button>
+                </div>
+              </div>
+
+              <div class="field" id="routineWeekdayField" hidden>
+                <div class="field-label" data-i18n="routines.on">On</div>
+                <select class="composer-input-small" id="routineWeekday"></select>
+              </div>
+              <div class="field" id="routineMonthdayField" hidden>
+                <div class="field-label" data-i18n="routines.day">Day of month</div>
+                <select class="composer-input-small" id="routineMonthday"></select>
+              </div>
+              <div class="field" id="routinePeriodField" hidden>
+                <div class="field-label" data-i18n="routines.every">Every ... days</div>
+                <input class="composer-input-small" id="routinePeriod" type="number" min="1" max="365" value="3" />
+              </div>
+
+              <div class="field">
+                <div class="field-label" data-i18n="composer.group">Group</div>
+                <select class="composer-input-small" id="routineGroup">
+                  <option value="">No group</option>
+                </select>
+              </div>
+
+              <button class="btn btn-primary" type="submit" data-i18n="routines.add">Add routine</button>
+            </form>
+          </section>
+
+          <div class="section-label" id="routinesLabel"></div>
+          <div class="routine-list" id="routineList"></div>
+          <div class="empty-list" id="routinesEmpty" hidden>
+            <div class="empty-list-icon" id="routinesEmptyIcon"></div>
+            <p data-i18n="routines.empty">No routines yet.</p>
+          </div>
         </section>
 
         <section class="view" id="view-settings" hidden>

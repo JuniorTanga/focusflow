@@ -1,6 +1,7 @@
 import {
   createTask,
   createGroup,
+  createRoutine,
   partitionTasks,
   pruneOldCompletions,
   validateReason,
@@ -8,10 +9,18 @@ import {
   guessDue,
   rolloverDue,
   dueDateFor,
+  dueBucket,
+  dueDateLabel,
   dayNumber,
   greetingFor,
   principleOfDay,
-  timeBucket
+  timeBucket,
+  nextOccurrenceDate,
+  firstOccurrence,
+  spawnOccurrence,
+  isSameDay,
+  addDays,
+  endOfWeek
 } from './logic.js';
 import { icon } from './icons.js';
 import { t, setLang, getLang, LANGS } from './i18n.js';
@@ -21,6 +30,7 @@ const $ = (id) => document.getElementById(id);
 
 let tasks = [];
 let groups = [];
+let routines = [];
 let themePreference = null;
 let userName = '';
 let langPreference = 'en';
@@ -30,6 +40,7 @@ let activeGroupId = null;
 let modalTaskId = null;
 let modalDue = 'today';
 let composing = { priority: 'medium', timebox: 30, groupId: '' };
+let routineForm = { priority: 'medium', timebox: 30, every: 'daily' };
 
 const BUCKET_ICON = { morning: 'sun', afternoon: 'sun', evening: 'moon', night: 'moon' };
 const CELEBRATION_COLORS = ['var(--accent)', 'var(--warm)', 'var(--accent-strong)'];
@@ -45,6 +56,7 @@ function loadState() {
     return {
       tasks: Array.isArray(data.tasks) ? data.tasks : [],
       groups: Array.isArray(data.groups) ? data.groups : [],
+      routines: Array.isArray(data.routines) ? data.routines : [],
       theme: data.theme === 'light' || data.theme === 'dark' ? data.theme : null,
       userName: typeof data.userName === 'string' ? data.userName : '',
       lang: LANGS.includes(data.lang) ? data.lang : 'en',
@@ -56,7 +68,7 @@ function loadState() {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, groups, theme: themePreference, userName, lang: langPreference, activeTaskId }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, groups, routines, theme: themePreference, userName, lang: langPreference, activeTaskId }));
 }
 
 /* ---------------- Theme ---------------- */
@@ -113,9 +125,19 @@ function priorityTag(task) {
   return `<span class="tag ${esc(p)}">${icon('zap')}${esc(t('priority.' + p))}</span>`;
 }
 
+function dueLabelText(task) {
+  const bucket = dueBucket(task, new Date());
+  return bucket === 'later' ? dueDateLabel(task.dueDate, getLang()) : t('due.' + bucket);
+}
+
+function repeatTag(task) {
+  return task.recurrence ? `<span class="tag repeat">${icon('repeat')}</span>` : '';
+}
+
 function dueTag(task) {
-  const d = task.due in { today: 1, tomorrow: 1, week: 1 } ? task.due : 'today';
-  return `<span class="tag ${esc(d)}">${icon('calendar')}${esc(t('due.' + d))}</span>`;
+  const bucket = dueBucket(task, new Date());
+  const cls = bucket === 'later' ? 'week' : bucket;
+  return `<span class="tag ${esc(cls)}">${icon('calendar')}${esc(dueLabelText(task))}</span>`;
 }
 
 function timeboxTag(task) {
@@ -127,7 +149,7 @@ function timeboxTag(task) {
 
 function setView(view) {
   currentView = view;
-  ['home', 'backlog', 'settings'].forEach((v) => {
+  ['home', 'backlog', 'routines', 'settings'].forEach((v) => {
     $('nav' + v.charAt(0).toUpperCase() + v.slice(1)).setAttribute('aria-pressed', String(v === view));
     $('view-' + v).hidden = v !== view;
   });
@@ -237,7 +259,7 @@ function renderHero(task) {
   $('hero').innerHTML = `
     <div class="hero-card" id="heroCard">
       <div class="hero-top">
-        <div class="hero-tags">${priorityTag(task)}${dueTag(task)}${timeboxTag(task)}${g ? `<span class="tag">${icon('folder')}${esc(g.name)}</span>` : ''}</div>
+        <div class="hero-tags">${priorityTag(task)}${dueTag(task)}${repeatTag(task)}${timeboxTag(task)}${g ? `<span class="tag">${icon('folder')}${esc(g.name)}</span>` : ''}</div>
         <div class="hero-actions-top">
           <button class="icon-btn" id="heroPostpone" title="${esc(t('action.postpone'))}" aria-label="${esc(t('action.postpone'))}">${icon('refresh')}</button>
           <button class="icon-btn danger" id="heroDelete" title="${esc(t('action.delete'))}" aria-label="${esc(t('action.delete'))}">${icon('trash')}</button>
@@ -290,7 +312,7 @@ function renderBacklog() {
       <span class="backlog-title">${esc(item.title)}</span>
       ${g ? `<span class="backlog-group"><span class="group-dot" data-dot="${esc(g.color)}"></span>${esc(g.name)}</span>` : ''}
       <span class="backlog-meta">
-        <span>${icon('calendar')}${esc(t('due.' + (item.due in { today: 1, tomorrow: 1, week: 1 } ? item.due : 'today')))}</span>
+        <span>${item.recurrence ? icon('repeat') : icon('calendar')}${esc(dueLabelText(item))}</span>
         ${item.timebox ? `<span>${icon('clock')}${item.timebox} min</span>` : ''}
       </span>
       ${groupMoveOptions(item)}
@@ -376,6 +398,8 @@ function renderAll() {
     renderHero(next);
   } else if (currentView === 'backlog') {
     renderBacklog();
+  } else if (currentView === 'routines') {
+    renderRoutines();
   } else {
     renderSettings();
   }
@@ -413,6 +437,10 @@ function completeTask(id) {
   if (!task) return;
   task.completedAt = new Date().toISOString();
   if (task.id === activeTaskId) activeTaskId = null;
+  if (task.routineId) {
+    const routine = routines.find((r) => r.id === task.routineId);
+    if (routine && routine.enabled) tasks.push(spawnOccurrence(routine, new Date()));
+  }
   saveState();
   renderAll();
   celebrate();
@@ -431,6 +459,197 @@ function deleteTask(id) {
   tasks = tasks.filter((t) => t.id !== id);
   saveState();
   renderAll();
+}
+
+/* ---------------- Routines ---------------- */
+
+function localeTag() {
+  return getLang() === 'fr' ? 'fr-FR' : 'en-GB';
+}
+
+function weekdayOptions(selected) {
+  const fmt = new Intl.DateTimeFormat(localeTag(), { weekday: 'long' });
+  let html = '';
+  for (let d = 0; d < 7; d++) {
+    const name = fmt.format(new Date(2026, 0, 4 + d));
+    html += `<option value="${d}" ${d === selected ? 'selected' : ''}>${esc(name)}</option>`;
+  }
+  return html;
+}
+
+function monthdayOptions(selected) {
+  let html = '';
+  for (let d = 1; d <= 31; d++) {
+    html += `<option value="${d}" ${d === selected ? 'selected' : ''}>${d}</option>`;
+  }
+  return html;
+}
+
+function populateGroupSelect(el, selected) {
+  const keep = selected && groups.some((g) => g.id === selected) ? selected : '';
+  routineForm.groupId = keep;
+  el.innerHTML = `<option value="">${esc(t('group.none'))}</option>` +
+    groups.map((g) => `<option value="${esc(g.id)}" ${g.id === keep ? 'selected' : ''}>${esc(g.name)}</option>`).join('');
+}
+
+function refreshSeg(el, value) {
+  el.querySelectorAll('.seg-btn').forEach((b) =>
+    b.setAttribute('aria-pressed', String(b.dataset.value === String(value))));
+}
+
+function applyCadenceVisibility() {
+  $('routineWeekdayField').hidden = routineForm.every !== 'weekly';
+  $('routineMonthdayField').hidden = routineForm.every !== 'monthly';
+  $('routinePeriodField').hidden = routineForm.every !== 'period';
+}
+
+function renderRoutineCreator() {
+  refreshSeg($('routinePrioritySeg'), routineForm.priority);
+  refreshSeg($('routineTimeboxSeg'), String(routineForm.timebox));
+  refreshSeg($('routineCadenceSeg'), routineForm.every);
+  $('routinePrioritySeg').querySelectorAll('.seg-btn').forEach((b) => {
+    b.textContent = t('priority.' + b.dataset.value);
+  });
+  $('routineCadenceSeg').querySelectorAll('.seg-btn').forEach((b) => {
+    b.textContent = t('cadence.' + b.dataset.value);
+  });
+  $('routineWeekday').innerHTML = weekdayOptions(new Date().getDay());
+  $('routineMonthday').innerHTML = monthdayOptions(new Date().getDate());
+  $('routinePeriod').value = $('routinePeriod').value || '3';
+  populateGroupSelect($('routineGroup'), routineForm.groupId);
+  applyCadenceVisibility();
+}
+
+function cadenceLabel(r) {
+  if (r.every === 'daily') return t('cadence.daily');
+  if (r.every === 'weekly') {
+    return new Intl.DateTimeFormat(localeTag(), { weekday: 'long' }).format(new Date(2026, 0, 4 + Number(r.on)));
+  }
+  if (r.every === 'monthly') return t('cadence.monthlyOn').replace('{n}', String(r.on));
+  return t('cadence.everyDays').replace('{n}', String(r.step || 1));
+}
+
+function fmtDate(d) {
+  const now = new Date();
+  if (isSameDay(d, now)) return t('due.today');
+  if (isSameDay(d, addDays(now, 1))) return t('due.tomorrow');
+  if (d <= endOfWeek(now)) return t('due.week');
+  return new Intl.DateTimeFormat(localeTag(), { weekday: 'short', day: 'numeric', month: 'short' }).format(d);
+}
+
+function nextDateLabel(r) {
+  const pending = tasks.find((t) => t.routineId === r.id && !t.completedAt);
+  const d = pending ? new Date(pending.dueDate + 'T00:00:00') : nextOccurrenceDate(r, new Date());
+  return fmtDate(d);
+}
+
+function routineCard(r) {
+  const g = groupById(r.groupId);
+  const action = r.enabled ? 'routines.pause' : 'routines.resume';
+  return `
+  <div class="routine-card">
+    <div class="routine-main">
+      <h3 class="routine-name">${esc(r.name)}</h3>
+      <div class="routine-tags">
+        ${r.enabled ? '' : `<span class="tag">${icon('pause')}${esc(t('routines.paused'))}</span>`}
+        <span class="tag ${esc(r.priority)}">${icon('zap')}${esc(t('priority.' + r.priority))}</span>
+        ${r.timebox ? `<span class="tag">${icon('clock')}${r.timebox} min</span>` : ''}
+        ${g ? `<span class="tag">${icon('folder')}${esc(g.name)}</span>` : ''}
+        ${r.whenWhere ? `<span class="tag">${icon('mapPin')}${esc(r.whenWhere)}</span>` : ''}
+      </div>
+      <div class="routine-cadence">${icon('repeat')}${esc(cadenceLabel(r))}</div>
+      <div class="routine-next">${esc(t('routines.next'))}: <strong>${esc(nextDateLabel(r))}</strong></div>
+    </div>
+    <div class="routine-actions">
+      <button class="icon-btn" data-toggle="${esc(r.id)}" title="${esc(t(action))}" aria-label="${esc(t(action))}">${icon(r.enabled ? 'pause' : 'play')}</button>
+      <button class="icon-btn danger" data-del="${esc(r.id)}" title="${esc(t('action.delete'))}" aria-label="${esc(t('action.delete'))}">${icon('trash')}</button>
+    </div>
+  </div>`;
+}
+
+function renderRoutines() {
+  renderRoutineCreator();
+  $('routinesSubLabel').textContent = t('routines.sub');
+  $('routinesLabel').innerHTML = `${icon('repeat')}${esc(t('routines.title'))} <span class="done-count">· ${routines.length}</span>`;
+  $('routinesEmptyIcon').innerHTML = icon('repeat');
+  $('routinesEmpty').hidden = routines.length > 0;
+  $('routineList').innerHTML = routines.map(routineCard).join('');
+  $('routineList').querySelectorAll('[data-toggle]').forEach((btn) => {
+    btn.addEventListener('click', () => toggleRoutine(btn.dataset.toggle));
+  });
+  $('routineList').querySelectorAll('[data-del]').forEach((btn) => {
+    btn.addEventListener('click', () => deleteRoutine(btn.dataset.del));
+  });
+}
+
+function addRoutineFromForm() {
+  const nameInput = $('routineName');
+  const name = nameInput.value.trim();
+  if (!name) {
+    nameInput.focus();
+    return;
+  }
+  const now = new Date();
+  const every = routineForm.every;
+  const routine = createRoutine({
+    name,
+    whenWhere: $('routineContext').value.trim() || null,
+    priority: routineForm.priority,
+    timebox: routineForm.timebox,
+    groupId: $('routineGroup').value || null,
+    every,
+    on: every === 'weekly' ? parseInt($('routineWeekday').value, 10)
+      : every === 'monthly' ? parseInt($('routineMonthday').value, 10)
+        : null,
+    step: every === 'period' ? parseInt($('routinePeriod').value, 10) || 1 : 1,
+    now
+  });
+  routines.push(routine);
+  tasks.push(firstOccurrence(routine, now));
+  nameInput.value = '';
+  $('routineContext').value = '';
+  saveState();
+  renderAll();
+}
+
+function toggleRoutine(id) {
+  const r = routines.find((x) => x.id === id);
+  if (!r) return;
+  r.enabled = !r.enabled;
+  saveState();
+  renderAll();
+}
+
+function deleteRoutine(id) {
+  routines = routines.filter((r) => r.id !== id);
+  saveState();
+  renderAll();
+}
+
+function setupRoutines() {
+  $('routineForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    addRoutineFromForm();
+  });
+  $('routinePrioritySeg').querySelectorAll('.seg-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      routineForm.priority = btn.dataset.value;
+      refreshSeg($('routinePrioritySeg'), routineForm.priority);
+    });
+  });
+  $('routineTimeboxSeg').querySelectorAll('.seg-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      routineForm.timebox = parseInt(btn.dataset.value, 10);
+      refreshSeg($('routineTimeboxSeg'), String(routineForm.timebox));
+    });
+  });
+  $('routineCadenceSeg').querySelectorAll('.seg-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      routineForm.every = btn.dataset.value;
+      refreshSeg($('routineCadenceSeg'), routineForm.every);
+      applyCadenceVisibility();
+    });
+  });
 }
 
 /* ---------------- Reschedule (friction) ---------------- */
@@ -613,7 +832,8 @@ const SHORTCUTS = [
   { key: 'n', mod: true, action: 'newTask' },
   { key: '1', mod: true, action: 'view', view: 'home' },
   { key: '2', mod: true, action: 'view', view: 'backlog' },
-  { key: '3', mod: true, action: 'view', view: 'settings' },
+  { key: '3', mod: true, action: 'view', view: 'routines' },
+  { key: '4', mod: true, action: 'view', view: 'settings' },
   { key: 'k', mod: true, action: 'focusTask' }
 ];
 
@@ -694,6 +914,7 @@ function setupSettings() {
     if (!confirm(t('settings.clearConfirm'))) return;
     tasks = [];
     groups = [];
+    routines = [];
     userName = '';
     activeTaskId = null;
     activeGroupId = null;
@@ -714,7 +935,8 @@ const SHORTCUT_LIST = [
   ['Ctrl+K', 'shortcut.focusTask'],
   ['Ctrl+1', 'shortcut.home'],
   ['Ctrl+2', 'shortcut.backlog'],
-  ['Ctrl+3', 'shortcut.settings'],
+  ['Ctrl+3', 'shortcut.routines'],
+  ['Ctrl+4', 'shortcut.settings'],
   ['Esc', 'shortcut.close']
 ];
 
@@ -723,6 +945,7 @@ function applyStrings() {
 
   $('navHome').innerHTML = `${icon('home')}${esc(t('nav.home'))}`;
   $('navBacklog').innerHTML = `${icon('list')}${esc(t('nav.backlog'))}`;
+  $('navRoutines').innerHTML = `${icon('repeat')}${esc(t('nav.routines'))}`;
   $('navSettings').innerHTML = `${icon('settings')}${esc(t('nav.settings'))}`;
   $('groupAdd').innerHTML = icon('folderPlus');
 
@@ -773,6 +996,7 @@ function init() {
   const saved = loadState();
   tasks = saved ? saved.tasks : [];
   groups = saved ? saved.groups : [];
+  routines = saved ? saved.routines : [];
   themePreference = saved ? saved.theme : null;
   userName = saved ? saved.userName : '';
   activeTaskId = saved ? saved.activeTaskId : null;
@@ -797,6 +1021,7 @@ function init() {
   setupGroupAdd();
   setupModal();
   setupSettings();
+  setupRoutines();
   setupShortcuts();
 
   $('settingsLangSeg').querySelectorAll('.seg-btn').forEach((btn) => {

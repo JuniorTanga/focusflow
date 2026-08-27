@@ -540,6 +540,41 @@ input, textarea, select { font-family: inherit; color: inherit; }
   padding: 3px 8px;
 }
 
+/* ---------- Routines ---------- */
+.routine-creator {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  box-shadow: var(--shadow-soft);
+  margin-bottom: 28px;
+}
+.routine-form { display: flex; flex-direction: column; }
+.routine-creator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.routine-form .btn-primary { align-self: flex-start; margin-top: 4px; }
+.routine-list { display: flex; flex-direction: column; gap: 12px; }
+.routine-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+}
+.routine-main { flex: 1; min-width: 0; }
+.routine-name { font-family: var(--font-display); font-size: 18px; margin-bottom: 8px; }
+.routine-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.routine-cadence { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-soft); margin-top: 10px; }
+.routine-cadence svg { width: 14px; height: 14px; }
+.routine-next { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
+.routine-actions { display: flex; gap: 8px; }
+@media (max-width: 560px) {
+  .routine-creator-grid { grid-template-columns: 1fr; }
+}
+
 /* ---------- Composer (sticky) ---------- */
 .composer {
   position: sticky;
