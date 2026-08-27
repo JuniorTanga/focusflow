@@ -90,31 +90,73 @@ export function resolveDueForReschedule(due) {
   return due === 'tomorrow' || due === 'week' ? due : 'today';
 }
 
-const DUE_HINTS = {
+const DAY_NUMBERS = {
+  a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5,
+  six: 6, seven: 7, eight: 8, nine: 9, ten: 10, couple: 2, few: 3,
+  un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5,
+  sept: 7, huit: 8, neuf: 9, dix: 10, quelques: 3, plusieurs: 4
+};
+
+function escRe(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const NUMBER_TOKENS = ['a couple', 'a few', ...Object.keys(DAY_NUMBERS)]
+  .sort((a, b) => b.length - a.length);
+
+const RE_IN_DAYS = new RegExp(
+  `\\b(?:in|dans)\\s+(?:(\\d+)|(${NUMBER_TOKENS.map(escRe).join('|')}))\\s*(?:of\\s+)?(?:days?|day|jours?|jour)\\b`
+);
+const RE_IN_WEEK = new RegExp('\\b(?:in|dans)\\s+(?:a|an|the|one|un|une)\\s+(?:week|semaine)\\b');
+
+const HINTS = {
+  today: [
+    'later today', 'today', 'tonight', 'this morning', 'this afternoon', 'this evening',
+    'in the morning', 'in the afternoon', 'in the evening', 'after lunch', 'after work',
+    'asap', 'right now', 'now',
+    "aujourd hui", 'ce matin', 'cet apres midi', 'cette apres midi', 'ce soir',
+    'apres le dejeuner', 'apres le travail', 'maintenant', 'tout de suite'
+  ],
+  tomorrow: [
+    'tomorrow', 'tmrw', 'demain', 'day after tomorrow', 'after tomorrow', 'apres demain',
+    'demain matin', 'demain soir'
+  ],
   week: [
     'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-    'this week', 'next week', 'this weekend', 'the weekend', 'weekend',
-    'by friday', 'end of week', 'end of the week', 'eow',
     'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche',
-    'cette semaine', 'la semaine prochaine', 'ce week-end', 'le week-end', 'week-end',
-    'fin de semaine'
-  ],
-  tomorrow: ['tomorrow', 'tmrw', 'demain'],
-  today: [
-    'later today', 'today', 'tonight', 'this afternoon', 'this evening', 'this morning',
-    'after lunch', 'after work', 'asap', 'right now', 'now',
-    "aujourd'hui", 'ce soir', 'cet après-midi', 'cette après-midi', 'ce matin',
-    'après le déjeuner', 'après le travail', 'maintenant', 'tout de suite'
+    'this week', 'next week', 'this weekend', 'the weekend', 'weekend', 'week end',
+    'end of week', 'end of the week', 'eow',
+    'cette semaine', 'la semaine prochaine', 'semaine prochaine',
+    'ce week end', 'le week end', 'fin de semaine'
   ]
 };
 
+function hintRegex(tokens) {
+  const sorted = tokens.length > 1 ? [...tokens].sort((a, b) => b.length - a.length) : tokens;
+  return new RegExp(`\\b(?:${sorted.map(escRe).join('|')})\\b`);
+}
+
+const RE_TODAY = hintRegex(HINTS.today);
+const RE_TOMORROW = hintRegex(HINTS.tomorrow);
+const RE_WEEK = hintRegex(HINTS.week);
+
+function normalizeNote(note) {
+  return ` ${String(note).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+    .replace(/[\p{Pd}_\s,.;:!?']+/gu, ' ')} `;
+}
+
+function inDaysBucket(text) {
+  const m = text.match(RE_IN_DAYS);
+  if (m) return (m[1] != null ? parseInt(m[1], 10) : DAY_NUMBERS[m[2]]) === 1 ? 'tomorrow' : 'week';
+  return RE_IN_WEEK.test(text) ? 'week' : null;
+}
+
 export function guessDue(note = '') {
-  const text = ' ' + String(note).toLowerCase().replace(/[\s,.;:!?—–]+/g, ' ') + ' ';
-  const inDays = text.match(/\b(in|dans)\s+(\d+)\s+(days?|day|jours?|jour)\b/);
-  if (inDays) return parseInt(inDays[2], 10) === 1 ? 'tomorrow' : 'week';
-  for (const bucket of ['week', 'tomorrow', 'today']) {
-    if (DUE_HINTS[bucket].some((w) => text.includes(' ' + w + ' '))) return bucket;
-  }
+  const text = normalizeNote(note);
+  const days = inDaysBucket(text);
+  if (RE_TODAY.test(text)) return 'today';
+  if (RE_TOMORROW.test(text) || days === 'tomorrow') return 'tomorrow';
+  if (RE_WEEK.test(text) || days === 'week') return 'week';
   return null;
 }
 

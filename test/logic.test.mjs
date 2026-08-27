@@ -187,6 +187,29 @@ test('guessDue reads date clues from when/where notes', () => {
   assert.equal(guessDue('   '), null);
 });
 
+test('guessDue folds accents and hyphens, reads word numbers', () => {
+  assert.equal(guessDue('Rendez-vous après-demain'), 'tomorrow');
+  assert.equal(guessDue('hand in before friday'), 'week');
+  assert.equal(guessDue('rendu avant vendredi'), 'week');
+  assert.equal(guessDue('start next Monday'), 'week');
+  assert.equal(guessDue('call in two days'), 'week');
+  assert.equal(guessDue('appeler dans trois jours'), 'week');
+  assert.equal(guessDue('finish in a day'), 'tomorrow');
+  assert.equal(guessDue('dans un jour'), 'tomorrow');
+  assert.equal(guessDue('ship it in a week'), 'week');
+  assert.equal(guessDue('rendez-vous dans une semaine'), 'week');
+  assert.equal(guessDue("in a couple of days"), 'week');
+  assert.equal(guessDue('in the morning'), 'today');
+  assert.equal(guessDue("aujourd'hui"), 'today');
+  assert.equal(guessDue('Build the knowledge base'), null);
+});
+
+test('guessDue favors the closest due when several clues collide', () => {
+  assert.equal(guessDue('today but also friday'), 'today');
+  assert.equal(guessDue('demain soir sinon ce soir'), 'today');
+  assert.equal(guessDue('in 2 days or tomorrow'), 'tomorrow');
+});
+
 test('timeBucket matches the hour', () => {
   assert.equal(timeBucket(new Date(2026, 7, 2, 6)), 'morning');
   assert.equal(timeBucket(new Date(2026, 7, 2, 14)), 'afternoon');
