@@ -26,6 +26,41 @@ export function dayNumber(now) {
   return Math.floor(localMidnight.getTime() / 86400000);
 }
 
+export function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+export function dateKey(date) {
+  const d = new Date(date);
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+export function endOfWeek(date) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
+  return d;
+}
+
+export function dueDateFor(due, now = new Date()) {
+  if (due === 'tomorrow') return dateKey(addDays(now, 1));
+  if (due === 'week') return dateKey(endOfWeek(now));
+  return dateKey(now);
+}
+
+function keyDays(key) {
+  const [y, m, d] = String(key).split('-').map(Number);
+  return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+}
+
+function overdueDays(task, now) {
+  if (!task.dueDate) return 0;
+  return Math.max(0, keyDays(dateKey(now)) - keyDays(task.dueDate));
+}
+
 export function createTask({ title, whenWhere = null, priority = 'medium', timebox = null, due = 'today', completedAt = null, groupId = null, lastPostponeReason = null, postponedAt = null, now = new Date() }) {
   return {
     id: newId(),
@@ -34,6 +69,7 @@ export function createTask({ title, whenWhere = null, priority = 'medium', timeb
     priority,
     timebox,
     due,
+    dueDate: dueDateFor(due, now),
     groupId,
     lastPostponeReason,
     postponedAt,
@@ -51,22 +87,24 @@ export function createGroup({ name, color = null, now = new Date() }) {
   };
 }
 
-function taskRank(task) {
-  const due = DUE_ORDER[task.due] ?? DUE_ORDER.today;
-  const priority = PRIORITY_ORDER[task.priority] ?? PRIORITY_ORDER.medium;
-  return due * 1000 + priority * 100;
+function bucketRank(task) {
+  return DUE_ORDER[task.due] ?? DUE_ORDER.today;
 }
 
-export function sortTasks(tasks) {
+export function sortTasks(tasks, now = new Date()) {
   return [...tasks].sort((a, b) => {
-    const byRank = taskRank(a) - taskRank(b);
-    if (byRank !== 0) return byRank;
+    const byBucket = bucketRank(a) - bucketRank(b);
+    if (byBucket !== 0) return byBucket;
+    const byOverdue = overdueDays(b, now) - overdueDays(a, now);
+    if (byOverdue !== 0) return byOverdue;
+    const byPriority = (PRIORITY_ORDER[a.priority] ?? PRIORITY_ORDER.medium) - (PRIORITY_ORDER[b.priority] ?? PRIORITY_ORDER.medium);
+    if (byPriority !== 0) return byPriority;
     return Date.parse(a.createdAt || 0) - Date.parse(b.createdAt || 0);
   });
 }
 
 export function partitionTasks(tasks, now = new Date(), activeTaskId = null) {
-  const incomplete = sortTasks(tasks.filter((t) => !t.completedAt));
+  const incomplete = sortTasks(tasks.filter((t) => !t.completedAt), now);
   const active = activeTaskId ? incomplete.find((t) => t.id === activeTaskId) ?? null : null;
   const postponedToday = (t) => t.postponedAt && isSameDay(new Date(t.postponedAt), now);
   const todayPool = incomplete.filter((t) => (t.due ?? 'today') === 'today' && !postponedToday(t));
@@ -158,6 +196,30 @@ export function guessDue(note = '') {
   if (RE_TOMORROW.test(text) || days === 'tomorrow') return 'tomorrow';
   if (RE_WEEK.test(text) || days === 'week') return 'week';
   return null;
+}
+
+function legacyDueDate(t, due, now) {
+  const base = new Date(t.postponedAt || t.createdAt || now);
+  if (due === 'tomorrow') return dateKey(addDays(base, 1));
+  if (due === 'week') return dateKey(endOfWeek(base));
+  return dateKey(base);
+}
+
+export function rolloverDue(tasks, now = new Date()) {
+  const todayK = dateKey(now);
+  let changed = false;
+  const next = tasks.map((t) => {
+    if (t.completedAt) return t;
+    const due = t.due ?? 'today';
+    const dueDate = t.dueDate || legacyDueDate(t, due, now);
+    let newDue = due;
+    if (due === 'tomorrow' && dueDate <= todayK) newDue = 'today';
+    else if (due === 'week' && dueDate < todayK) newDue = 'today';
+    if (t.dueDate === dueDate && newDue === due) return t;
+    changed = true;
+    return { ...t, due: newDue, dueDate };
+  });
+  return changed ? { tasks: next, changed: true } : { tasks, changed: false };
 }
 
 export function timeBucket(now = new Date()) {

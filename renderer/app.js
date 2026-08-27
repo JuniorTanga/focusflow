@@ -6,6 +6,9 @@ import {
   validateReason,
   resolveDueForReschedule,
   guessDue,
+  rolloverDue,
+  dueDateFor,
+  dayNumber,
   greetingFor,
   principleOfDay,
   timeBucket
@@ -473,6 +476,7 @@ function confirmReschedule() {
   const task = tasks.find((t) => t.id === modalTaskId);
   if (!task || !validateReason($('reasonInput').value)) return;
   task.due = modalDue;
+  task.dueDate = dueDateFor(modalDue, new Date());
   task.lastPostponeReason = $('reasonInput').value.trim();
   task.postponedAt = new Date().toISOString();
   if (task.id === activeTaskId) activeTaskId = null;
@@ -779,10 +783,14 @@ function init() {
 
   const now = new Date();
   const pruned = pruneOldCompletions(tasks, now);
-  if (pruned.length !== tasks.length) {
-    tasks = pruned;
-    saveState();
+  let dirty = pruned.length !== tasks.length;
+  tasks = pruned;
+  const rolled = rolloverDue(tasks, now);
+  if (rolled.changed) {
+    tasks = rolled.tasks;
+    dirty = true;
   }
+  if (dirty) saveState();
 
   setupTitlebar();
   setupComposer();
@@ -812,7 +820,19 @@ function init() {
     }
   });
 
+  let lastDay = dayNumber(new Date());
   setInterval(() => {
+    const tickNow = new Date();
+    if (dayNumber(tickNow) !== lastDay) {
+      lastDay = dayNumber(tickNow);
+      const tickRolled = rolloverDue(tasks, tickNow);
+      if (tickRolled.changed) {
+        tasks = tickRolled.tasks;
+        saveState();
+      }
+      renderAll();
+      return;
+    }
     if (currentView !== 'home') return;
     const { doneToday } = getPartition();
     renderGreeting(doneToday.length);

@@ -9,6 +9,8 @@ import {
   validateReason,
   resolveDueForReschedule,
   guessDue,
+  rolloverDue,
+  dueDateFor,
   greetingFor,
   principleOfDay,
   timeBucket,
@@ -265,4 +267,76 @@ test('principleOfDay supports French', () => {
 test('dayNumber is monotonic across days', () => {
   assert.ok(dayNumber(new Date(2026, 7, 3)) > dayNumber(new Date(2026, 7, 2)));
   assert.equal(dayNumber(new Date(2026, 7, 2, 1)), dayNumber(new Date(2026, 7, 2, 23)));
+});
+
+test('createTask stamps the dueDate matching the due bucket', () => {
+  assert.equal(task({ title: 't' }).dueDate, '2026-08-02');
+  assert.equal(task({ title: 't', due: 'tomorrow' }).dueDate, '2026-08-03');
+  const wk = task({ title: 't', due: 'week', now: new Date(2026, 7, 3, 9) });
+  assert.equal(wk.dueDate, '2026-08-09');
+  assert.equal(dueDateFor('week', new Date(2026, 7, 2)), '2026-08-02');
+  assert.equal(dueDateFor('tomorrow', new Date(2026, 7, 2)), '2026-08-03');
+  assert.equal(dueDateFor('today', new Date(2026, 7, 2)), '2026-08-02');
+});
+
+test('rolloverDue turns a tomorrow task into today once its day arrives', () => {
+  const t = task({ title: 't', due: 'tomorrow', now: new Date(2026, 7, 2, 9) });
+  const sameDay = rolloverDue([t], new Date(2026, 7, 2, 12));
+  assert.equal(sameDay.changed, false);
+  assert.equal(sameDay.tasks[0].due, 'tomorrow');
+  const nextDay = rolloverDue([t], new Date(2026, 7, 3, 7));
+  assert.equal(nextDay.changed, true);
+  assert.equal(nextDay.tasks[0].due, 'today');
+  assert.equal(nextDay.tasks[0].dueDate, '2026-08-03');
+  const later = rolloverDue([t], new Date(2026, 7, 4, 7));
+  assert.equal(later.tasks[0].due, 'today');
+  assert.equal(later.tasks[0].dueDate, '2026-08-03');
+});
+
+test('rolloverDue promotes a week task only after the week closes', () => {
+  const t = task({ title: 't', due: 'week', now: new Date(2026, 7, 3, 9) });
+  const during = rolloverDue([t], new Date(2026, 7, 8, 9));
+  assert.equal(during.changed, false);
+  assert.equal(during.tasks[0].due, 'week');
+  const after = rolloverDue([t], new Date(2026, 7, 10, 9));
+  assert.equal(after.changed, true);
+  assert.equal(after.tasks[0].due, 'today');
+  assert.equal(after.tasks[0].dueDate, '2026-08-09');
+});
+
+test('rolloverDue leaves completed tasks alone and keeps carried-over urgency', () => {
+  const done = task({ title: 'done', due: 'tomorrow', completedAt: new Date(2026, 7, 2, 9).toISOString() });
+  const today = task({ title: 't', now: new Date(2026, 7, 3, 9) });
+  const res = rolloverDue([done, today], new Date(2026, 7, 5, 9));
+  assert.equal(res.changed, false);
+  assert.equal(res.tasks[0].due, 'tomorrow');
+  assert.equal(res.tasks[1].due, 'today');
+  assert.equal(res.tasks[1].dueDate, '2026-08-03');
+});
+
+test('rolloverDue migrates legacy tasks that lack a dueDate', () => {
+  const legacy = { ...task({ title: 'legacy', priority: 'high' }), due: 'week' };
+  delete legacy.dueDate;
+  legacy.createdAt = new Date(2026, 7, 16, 9).toISOString();
+  const res = rolloverDue([legacy], new Date(2026, 7, 17, 9));
+  assert.equal(res.changed, true);
+  assert.equal(res.tasks[0].due, 'today');
+  assert.equal(res.tasks[0].dueDate, '2026-08-16');
+});
+
+test('the most overdue task wins the today pool and the hero', () => {
+  const lateWeek = task({ title: 'a', now: new Date(2026, 7, 2, 9) });
+  const yesterday = task({ title: 'b', priority: 'high', now: new Date(2026, 7, 1, 9) });
+  const fresh = task({ title: 'c', now: new Date(2026, 7, 3, 9) });
+  const ordered = sortTasks([fresh, lateWeek, yesterday], new Date(2026, 7, 3, 9));
+  assert.deepEqual(ordered.map((t) => t.title), ['b', 'a', 'c']);
+  const { next } = partitionTasks([fresh, lateWeek, yesterday], new Date(2026, 7, 3, 9));
+  assert.equal(next.title, 'b');
+});
+
+test('a pinned task overrides overdue ordering', () => {
+  const lateWeek = task({ title: 'late', now: new Date(2026, 7, 2, 9) });
+  const fresh = task({ title: 'fresh', now: new Date(2026, 7, 3, 9) });
+  const { next } = partitionTasks([lateWeek, fresh], new Date(2026, 7, 3, 9), fresh.id);
+  assert.equal(next.title, 'fresh');
 });
